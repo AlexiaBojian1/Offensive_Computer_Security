@@ -1,0 +1,6 @@
+# Folders
+build/
+bin/
+
+# Files
+compile_commands.json

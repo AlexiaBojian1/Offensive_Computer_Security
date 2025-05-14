@@ -1,0 +1,9 @@
+# Installation
+
+You will need the following packages:
+1. pkg-config (Automatically link libraries in compilation)
+2. gtk3 (User Interface library for C)
+
+# Compilation/Running
+To compile the application run `sudo make`.
+To run the compiled application run the `app` file in the bin directory.

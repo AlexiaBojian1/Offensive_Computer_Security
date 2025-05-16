@@ -27,13 +27,13 @@ def eventAttackButtonPressed(window):
     
 
 def eventPauseButtonPressed(window):
-        if not window.paused:
-            window.paused = True
-            window.pause_event.set()
-            window.pause_btn.setText("Resume")
-            window.log("[!] Paused")
-        else:
-            window.paused = False
-            window.pause_event.clear()
-            window.pause_btn.setText("Pause")
-            window.log("[+] Resumed")
+    if not window.paused:
+        window.paused = True
+        window.pause_event.set()
+        window.pause_btn.setText("Resume")
+        window.log("[!] Paused")
+    else:
+        window.paused = False
+        window.pause_event.clear()
+        window.pause_btn.setText("Pause")
+        window.log("[+] Resumed")

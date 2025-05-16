@@ -1,0 +1,4 @@
+# Ignore all cached python files
+**/__pycache__/
+
+**/*.pyc

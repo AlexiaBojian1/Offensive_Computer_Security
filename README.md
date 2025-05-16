@@ -80,7 +80,7 @@ $ dig +short other.com
 # no reply (unless --relay is used)
 ```
 
-![Victim & Attacker VMs side-by-side](images/lab-setup.png)
+![Victim & Attacker VMs side-by-side](images/exampleDns.jpeg)
 
 To enable relay mode so that other domains still resolve correctly:
 

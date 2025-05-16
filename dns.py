@@ -119,7 +119,7 @@ class DNSSpoofer(threading.Thread):
 
 def load_mapping(path: Path) -> Dict[str, str]:
     raw = yaml.safe_load(path.read_text())
-    mapping: Dict[str, str] = {}
+    mapping = {}
     for k, v in raw.items():
         try:
             ipaddress.ip_address(v)

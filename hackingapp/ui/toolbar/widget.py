@@ -12,6 +12,8 @@ from scapy.all import get_if_list
 class ToolbarWidget(QToolBar):
 
     ifaceSelectionUpdate = Signal(str)
+    attackTypeChanged = Signal(str)
+    dnsMappingLoaded = Signal(dict)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -28,6 +30,7 @@ class ToolbarWidget(QToolBar):
         self.attack_combo = QComboBox()
         self.addWidget(self.attack_combo)
         self.addSeparator()
+        self.attack_combo.currentTextChanged.connect(self.attackTypeChanged)
 
         dns_map_action = QAction("Load DNS Mapping…", self)
         dns_map_action.triggered.connect(self.dnsSpoofSelectTrigger)
@@ -69,7 +72,7 @@ class ToolbarWidget(QToolBar):
             return
         self.mapping_file = path
         self.mapping_path.setText(path)
-        self.log(f"Loaded DNS mapping: {len(self.dns_mapping)} entries")
+        self.dnsMappingLoaded.emit(self.dns_mapping)
 
     def helpButtonTrigger(self):
         """

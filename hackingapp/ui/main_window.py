@@ -3,6 +3,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout)
 from hackingapp.models.attackTypeEnum import AttackType
 from hackingapp.ui.toolbar.widget import ToolbarWidget
 from hackingapp.ui.arp.interface import ARPInterface
+from hackingapp.ui.dns.interface import DNSInterface
 
 class MainWindow(QMainWindow):
     """
@@ -29,10 +30,26 @@ class MainWindow(QMainWindow):
         self.addToolBar(self.toolbar)
 
         # Instantiate & install ARP interface
-        self.arpInterface = ARPInterface(parent=self)
-        main_layout.addLayout(self.arpInterface)
+        self.arpWidget = QWidget()
+        self.arpInterface = ARPInterface(parent=self.arpWidget)
+        self.arpWidget.setLayout(self.arpInterface)
+        main_layout.addWidget(self.arpWidget)
 
-        # Hook toolbar iface event to ARP interface
+        # Instantiate & install DNS interface
+        self.dnsWidget = QWidget()
+        self.dnsInterface = DNSInterface(parent=self.dnsWidget)
+        self.dnsWidget.setLayout(self.dnsInterface)
+        main_layout.addWidget(self.dnsWidget)
+        self.dnsWidget.setVisible(False)
+
+        # Hook toolbar signals to interfaces
+        self.toolbar.attackTypeChanged.connect(self.switch_attack_interface)
         self.toolbar.ifaceSelectionUpdate.connect(self.arpInterface.onIfaceUpdate)
+        self.toolbar.dnsMappingLoaded.connect(self.dnsInterface.set_mapping)
+
+
         self.arpInterface._iface = self.toolbar.interface_combo.currentText()
 
+    def switch_attack_interface(self, attack_type: str):
+        self.arpWidget.setVisible(attack_type == "ARP")
+        self.dnsWidget.setVisible(attack_type == "DNS")

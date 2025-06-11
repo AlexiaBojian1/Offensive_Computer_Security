@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
-Fully‑fledged ARP spoofing / poisoning tool built with Scapy.
 
-Features
---------
 * **Pair mode**      – poison one or more <victim, gateway> pairs (default).
 * **Flood mode**     – claim every IP of a CIDR is at the attacker’s MAC.
 * **Silent mode**    – answer only when ARP requests are heard (stealthy).
@@ -11,8 +8,6 @@ Features
 * Graceful clean‑up: correct ARP entries are restored on Ctrl‑C.
 * Threaded design – you can mix pair lists, flood, silent, etc.
 
-Usage example
--------------
     sudo python3 arp_poisoner_fully_fledged.py \
         --iface enp0s10 \
         --victims 10.0.123.4,10.0.123.7 \
@@ -28,11 +23,6 @@ Usage example
         --iface enp0s10 \
         --mode silent \
         --victims 10.0.123.4 --gateway 10.0.123.1
-
-Legal note
------------
-Use **only** in a controlled lab or with explicit, informed permission.
-Unauthorized ARP spoofing is illegal and unethical.
 """
 
 import ipaddress

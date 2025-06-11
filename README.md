@@ -26,7 +26,9 @@ Place the main script (ui.py) and help.pdf in the same folder.
 
 ## Launching the Application
 Run the UI with sudo (or equivalent):
+```bash
 sudo python -m hackingapp.app
+```
 
 ## Main Window Layout
 

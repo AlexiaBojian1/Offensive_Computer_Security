@@ -1,9 +1,4 @@
-"""dns_spoofer_fully_fledged.py
-================================
-Fully‑fledged, drop‑in DNS poisoning / relay tool built on top of Scapy.
-
-Key additions compared to the classroom PoC
--------------------------------------------
+"""
 * **IPv6 & AAAA support** – answers both A and AAAA queries, forges IPv6
   packets where needed.
 * **DNS‑over‑TCP (port 53/tcp)** – uses a second sniffer thread and crafts
@@ -17,10 +12,6 @@ Key additions compared to the classroom PoC
 * **Custom BPF filter** – `--bpf` lets you narrow in on one victim subnet
   without editing the code.
 * **Graceful shutdown** – both UDP and TCP sniffers stop on Ctrl‑C.
-
-The implementation stays *pure‑Python* (no raw `libnetfilter‑queue`) so it
-works on Kali, macOS, WSL, Docker, or a Raspberry Pi, as long as the user
-runs as root or has enough capabilities (e.g. `CAP_NET_RAW`).
 """
 
 from __future__ import annotations

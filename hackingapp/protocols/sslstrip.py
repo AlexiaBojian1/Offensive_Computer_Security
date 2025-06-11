@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""
-Transparent SSL-stripping proxy implemented **entirely with Scapy**.
-
-▪ Listens passively, rewrites packets in-flight, then reinjects them.
-▪ Removes HSTS / CSP upgrade headers.
-▪ Downgrades https:// → http:// in Location / Refresh headers *and*
-  in the first ≤128 kB of HTML/JS bodies.
-▪ Keeps TCP sequence numbers consistent by tracking per-flow deltas.
-▪ Handles gzip bodies (by killing Accept-Encoding on the request side).
-▪ Works with chunked or fixed-length responses.
-
-Run as root:
-
-    # 1 – let the kernel drop HTTP packets so *we* resend the edited copy
-    sudo iptables -I FORWARD -p tcp --dport 80  -j DROP
-    sudo iptables -I FORWARD -p tcp --sport 80  -j DROP
-
-    # 2 – start the stripper
-    sudo python sslstrip_scapy.py -i eth0
-
-ARP-poison & DNS-spoof from your other threads, then browse from the victim.
-"""
-
 import argparse, gzip, logging, re, sys, time
 from collections import defaultdict
 from pathlib import Path

@@ -2,7 +2,10 @@
 
 There are 2 sections in this README:
 1. The GUI
-2. The DNS spoofing guide
+2. The ARP spoofing guige 
+3. The DNS spoofing guide
+4. The SSL stripping guide
+5. The MITM guide
 
 # Graphical User Interface (GUI)
 
@@ -75,6 +78,163 @@ Click Stop to terminate all attacks and return to an idle state
 Click the Help button to open help.pdf
 
 If the PDF is missing, you’ll see an error prompt
+# VMs setup
+
+| VM role | Example IP | Example MAC | Notes |
+|---------|------------|-------------|-------|
+| **Attacker** | `10.0.50.5` | `08:00:27:AA:BB:01` | runs `ARPPoisoner`, enable IP-forward |
+| **Victim 1** | `10.0.50.11` | `08:00:27:AA:BB:11` | |
+| **Victim 2** *(optional)* | `10.0.50.12` | `08:00:27:AA:BB:12` | second target |
+| **Gateway / Router** | `10.0.50.1` | `52:54:00:12:35:00` | VM-net virtual router |
+
+* All NICs sit on the **same Host-Only / Internal** switch (no NAT / Bridged).  
+* Discover each address & MAC:
+
+```bash
+ip addr show                # own IP & MAC
+ip route | grep default     # gateway IP
+ip neigh | grep <gw-ip>     # gateway MAC
+```
+# ARP Poisoning 
+
+A **Scapy‑powered toolkit** that ships in two flavours:
+
+1. **Fully‑fledged CLI** – run complex attacks from the terminal (`arp.py`).
+
+---
+
+
+##  Features
+
+| Mode               | Purpose                                                                              |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| **Pair** (default) | Poison one or more `<victim IP, gateway IP>` pairs – classic MITM.                   |
+| **Flood**          | Claim **every IP** in a CIDR is at the attacker’s MAC; causes widespread disruption. |
+| **Silent**         | Only answers when ARP *requests* are observed – stealthier than active spraying.     |
+
+Additional goodness:
+
+* **Active/Silent toggle** – choose periodic bursts (`--interval`) or reactive replies.
+* **Automatic MAC resolution** – queries real MACs before forging packets.
+* **Graceful shutdown** – real ARP entries are restored on *Ctrl‑C* (pair + silent modes).
+* **Threaded design** – mix multiple pair lists, flood, and silent responders concurrently.
+* **Pluggable logging** – Python `logging` with console output by default.
+
+---
+
+##  Requirements
+
+| Item       | Version / Notes                            |
+| ---------- | ------------------------------------------ |
+| Python     | 3.8 +                                      |
+| Scapy      | `pip install scapy`                        |
+| OS         | Linux / \*BSD / macOS (raw‑socket support) |
+| Privileges | Run as **root** or with `CAP_NET_RAW`      |
+
+---
+
+## Installation
+
+```bash
+# 1. Clone repo (or copy the files)
+$ git clone https://github.com/your-handle/arp-poisoner.git
+$ cd arp-poisoner
+
+# 2. (Optional) Virtual env
+$ python3 -m venv venv && source venv/bin/activate
+
+# 3. Install deps
+$ pip install -r requirements.txt  # currently just scapy
+```
+
+---
+
+##  CLI Quick Start
+
+```bash
+# Active pair poisoning (default)
+sudo python3 arp_poisoner_fully_fledged.py \
+    --iface enp0s10 \
+    --victims 10.0.123.4,10.0.123.7 \
+    --gateway 10.0.123.1 \
+    --interval 4
+
+# Flood an entire /24 every 10 s
+sudo python3 arp_poisoner_fully_fledged.py \
+    --iface enp0s10 \
+    --mode flood \
+    --cidr 10.0.123.0/24 \
+    --gateway 10.0.123.1
+
+# Silent responder (reactive only)
+sudo python3 arp_poisoner_fully_fledged.py \
+    --iface enp0s10 \
+    --mode silent \
+    --victims 10.0.123.4 \
+    --gateway 10.0.123.1
+```
+
+### CLI Reference
+
+| Option         | Default    | Description                                          |
+| -------------- | ---------- | ---------------------------------------------------- |
+| `--iface, -i`  | *required* | Network interface to send/receive on (e.g., `eth0`). |
+| `--mode`       | `pair`     | `pair`, `flood`, or `silent`.                        |
+| `--victims`    | –          | Comma‑separated victim IPs (`pair`/`silent`).        |
+| `--gateway`    | –          | Gateway IP (`pair`/`silent`/`flood`).                |
+| `--cidr`       | –          | CIDR block to flood (`flood` mode).                  |
+| `--interval`   | `10`       | Seconds between bursts in active modes.              |
+| `--no‑restore` | *False*    | Skip pushing real MACs back on exit (pair modes).    |
+
+Run `-h/--help` to see the full list any time.
+
+---
+
+##  Library Usage
+
+```python
+from arppoisoner import ARPPoisoner
+import time
+
+poisoner = ARPPoisoner(log=lambda m: print(f"[+] {m}"))
+poisoner.setInterface("eth0")
+poisoner.setTargets([
+    ("192.168.1.10", "192.168.1.1"),
+    ("192.168.1.1",  "192.168.1.10"),
+])
+poisoner.start()
+try:
+    time.sleep(60)
+finally:
+    poisoner.stop()
+```
+
+---
+
+##  How It Works (Very Short)
+
+* **ARP cache** ⇒ local table of IP→MAC mappings used by hosts to send Ethernet frames.
+* Tool forges **ARP *reply* packets** claiming: `spoof_ip is‑at attacker_mac`.
+* Victims update their cache, redirecting IPv4 traffic to you. Combine with packet‑forwarding + `iptables`/`pf` for full man‑in‑the‑middle.
+
+---
+
+##  Cleanup / Restoration
+
+Pair & silent modes automatically push correct MACs back **5×** on exit. If you skipped restoration (`--no-restore`) or used flood mode, caches will age out naturally (typically 1–5 min). You can also broadcast real entries manually:
+
+```bash
+# restore: <gateway_ip> is‑at <gateway_mac>
+```
+
+---
+
+##  Roadmap
+
+* IPv6 (Neighbor Discovery) support
+* DNS‑spoof helper integrated into silent mode
+* PyPI & standalone `.deb` package
+* pytest‑based test‑suite using Scapy’s offline PCAPs
 
 
 # DNS Spoofer Tool

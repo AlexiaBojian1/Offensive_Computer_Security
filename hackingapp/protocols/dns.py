@@ -1,3 +1,18 @@
+"""
+* **IPv6 & AAAA support** – answers both A and AAAA queries, forges IPv6
+  packets where needed.
+* **DNS‑over‑TCP (port 53/tcp)** – uses a second sniffer thread and crafts
+  sequence‑correct responses so Windows / DoH fallback still resolve.
+* **Multiple answers per name** – YAML can map a domain to a *single* IP
+  (string) or a *list* of IPs (A or AAAA).  Each value is validated.
+* **Wildcard logic** – unchanged, but now works with the list syntax.
+* **Configurable TTL** – `--ttl` flag.
+* **Silent ⇄ Verbose modes** – `--quiet` and `--verbose` flip Python’s
+  logging level.
+* **Custom BPF filter** – `--bpf` lets you narrow in on one victim subnet
+  without editing the code.
+* **Graceful shutdown** – both UDP and TCP sniffers stop on Ctrl‑C.
+"""
 
 from __future__ import annotations
 

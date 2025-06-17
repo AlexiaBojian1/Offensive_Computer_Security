@@ -4,6 +4,7 @@ from hackingapp.models.attackTypeEnum import AttackType
 from hackingapp.ui.toolbar.widget import ToolbarWidget
 from hackingapp.ui.arp.interface import ARPInterface
 from hackingapp.ui.dns.interface import DNSInterface
+from hackingapp.ui.ssl.interface import SSLStripInterface
 
 class MainWindow(QMainWindow):
     """
@@ -42,6 +43,13 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.dnsWidget)
         self.dnsWidget.setVisible(False)
 
+        # Instantiate & install SSL interface
+        self.sslWidget = QWidget()
+        self.sslInterface = SSLStripInterface(parent=self.sslWidget)
+        self.sslWidget.setLayout(self.sslInterface)
+        main_layout.addWidget(self.sslWidget)
+        self.sslWidget.setVisible(False)
+
         # Hook toolbar signals to interfaces
         self.toolbar.attackTypeChanged.connect(self.switch_attack_interface)
         self.toolbar.ifaceSelectionUpdate.connect(self.arpInterface.onIfaceUpdate)
@@ -53,3 +61,4 @@ class MainWindow(QMainWindow):
     def switch_attack_interface(self, attack_type: str):
         self.arpWidget.setVisible(attack_type == "ARP")
         self.dnsWidget.setVisible(attack_type == "DNS")
+        self.sslWidget.setVisible(attack_type == "SSL")

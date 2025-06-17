@@ -1,6 +1,7 @@
 import sys
 import os
 
+import yaml
 from PySide6.QtWidgets import (
     QLabel, QComboBox, QToolBar, QLineEdit, QFileDialog, QMessageBox
 )

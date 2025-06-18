@@ -157,8 +157,8 @@ def proc(pkt, iface, host_filter):
 def main():
     ap = argparse.ArgumentParser(description='SSL-stripper (Python 2.7, Scapy)')
     ap.add_argument('-i', '--iface', help='interface to sniff/reinject')
-    ap.add_argument('--bpf', default='tcp port 443',
-                    help='extra/alternative BPF (ANDed) [default: tcp port 443]')
+    ap.add_argument('--bpf', default='tcp port 80',
+                    help='extra/alternative BPF (ANDed) [default: tcp port 80]')
     ap.add_argument('--hosts',
                     help='comma-separated hostnames or wildcards to target')
     vq = ap.add_mutually_exclusive_group()

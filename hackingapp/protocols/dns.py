@@ -210,7 +210,7 @@ def main(argv=None):
     import argparse
 
     parser = argparse.ArgumentParser(
-        prog='dns_spoofer27.py',
+        prog='dns.py',
         formatter_class=argparse.RawTextHelpFormatter,  # ← keep \n as-is
         description=(
             "DNS spoof / selective relay for Python-2.7 + Scapy 2.4.x\n"
@@ -223,13 +223,13 @@ MODES
 
 EXAMPLES
   # 1) Classic spoof + relay so browsing does not break
-  sudo python2 dns_spoofer27.py -i eth0 -m spoof.yml --relay -v
+  sudo python2 dns.py -i eth0 -m spoof.yml --relay -v
 
   # 2) Quiet spoof, custom TTL
-  sudo python2 dns_spoofer27.py -i wlan0 -m demo.yml --ttl 60 -q
+  sudo python2 dns.py -i wlan0 -m demo.yml --ttl 60 -q
 
   # 3) Run only on DNS traffic of a captive portal subnet
-  sudo python2 dns_spoofer27.py -i eth0 -m corp.yml --bpf "udp and net 10.66.0.0/16"
+  sudo python2 dns.py -i eth0 -m corp.yml --bpf "udp and net 10.66.0.0/16"
 """
     )
 

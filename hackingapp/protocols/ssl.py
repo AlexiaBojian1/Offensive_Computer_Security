@@ -153,9 +153,7 @@ def proc(pkt, iface, host_filter):
             _adjust_tcp(tcp, state.s2c_delta, state.c2s_delta)
         _fwd(pkt, payload, iface)
 
-# --------------------------------------------------------------------------- #
-# main
-# --------------------------------------------------------------------------- #
+
 def main():
     ap = argparse.ArgumentParser(description='SSL-stripper (Python 2.7, Scapy)')
     ap.add_argument('-i', '--iface', help='interface to sniff/reinject')

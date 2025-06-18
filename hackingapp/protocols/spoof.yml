@@ -1,9 +1,10 @@
 google.com: "10.0.123.5"
 
-"*.example.org":
+"*.example.org":            # IPv4 only
   - "10.0.123.5"
-  - "fd00:123::5" 
+
+"*.example.org-aaaa":       # <-- fake key you will query with dig -t AAAA
+  - "fd00:123::5"
 
 intranet.lan:
   - "10.0.123.5"
-  - "fd00:123::5"

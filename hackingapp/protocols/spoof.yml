@@ -1,7 +1,7 @@
 google.com: "10.0.123.5"
 
 "*.example.org":
-  - "157.240.201.35"   # A
+  - "10.0.123.5"   # A
   - "fd00:123::5"  # AAAA
 
 intranet.lan:

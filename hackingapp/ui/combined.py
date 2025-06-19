@@ -15,7 +15,7 @@ class ArpFrame(tk.Frame):
         tk.Button(self, text="Launch ARP UI", command=self.launch_arp).pack(pady=10)
 
     def launch_arp(self):
-        path = os.path.join(SCRIPT_DIR, 'arpui.py')
+        path = os.path.join(SCRIPT_DIR, 'arp_ui.py')
         # Launch subprocess in daemon thread
         def runner():
             subprocess.call(['sudo', 'python2', path])
@@ -30,7 +30,7 @@ class DNSFrame(tk.Frame):
         tk.Button(self, text="Launch DNS UI", command=self.launch_dns).pack(pady=10)
 
     def launch_dns(self):
-        path = os.path.join(SCRIPT_DIR, 'dnsui.py')
+        path = os.path.join(SCRIPT_DIR, 'dns_ui.py')
         def runner():
             subprocess.call(['sudo', 'python2', path])
         t = threading.Thread(target=runner)
@@ -44,7 +44,7 @@ class SSLFrame(tk.Frame):
         tk.Button(self, text="Launch SSL UI", command=self.launch_ssl).pack(pady=10)
 
     def launch_ssl(self):
-        path = os.path.join(SCRIPT_DIR, 'sslui.py')
+        path = os.path.join(SCRIPT_DIR, 'ssl_ui.py')
         def runner():
             subprocess.call(['sudo', 'python2', path])
         t = threading.Thread(target=runner)

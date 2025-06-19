@@ -112,7 +112,7 @@ class ArpSpoofUI(tk.Tk):
                     args,
                     cwd=os.path.dirname(script),
                     stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,   # ← merge stderr into stdout
+                    stderr=subprocess.STDOUT, 
                     bufsize=1,
                     universal_newlines=True
                 )

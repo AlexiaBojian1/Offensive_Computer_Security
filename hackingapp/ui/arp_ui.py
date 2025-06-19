@@ -8,7 +8,7 @@ from scapy.all import get_if_list
 
 class ArpSpoofUI(tk.Tk):
     def __init__(self):
-        super(ArpSpoofUI, self).__init__()
+        tk.Tk.__init__(self)
         self.title("ARP Spoofing Tool UI")
         self.process = None
 
@@ -53,7 +53,9 @@ class ArpSpoofUI(tk.Tk):
         # Buttons
         self.start_btn = tk.Button(self, text="Start", command=self.start_attack)
         self.start_btn.grid(row=6, column=0, padx=5, pady=10)
-        self.stop_btn = tk.Button(self, text="Stop", state='disabled', command=self.stop_attack)
+        self.stop_btn = tk.Button(
+            self, text="Stop", state='disabled', command=self.stop_attack
+        )
         self.stop_btn.grid(row=6, column=1, padx=5, pady=10)
 
         # Log output
@@ -91,7 +93,9 @@ class ArpSpoofUI(tk.Tk):
         if mode == 'flood' and (not cidr or not gateway):
             return self._log("Error: CIDR and Gateway are required for flood mode.\n")
 
-        script = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py'))
+        script = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
+        )
         args = ['python2', '-u', script, '-i', iface, '--mode', mode, '--interval', interval]
         if mode in ('pair', 'silent'):
             args += ['--victims', victims, '--gateway', gateway]
@@ -117,11 +121,9 @@ class ArpSpoofUI(tk.Tk):
                 self._on_process_end()
                 return
 
-            # read stdout
             for line in iter(self.process.stdout.readline, ''):
                 self._log(line)
             self.process.stdout.close()
-            # read stderr
             for line in iter(self.process.stderr.readline, ''):
                 self._log(line)
             self.process.stderr.close()

@@ -84,7 +84,7 @@ def _adjust_tcp(pkt, seq_d, ack_d):
     if ack_d:
         pkt.ack = (pkt.ack + ack_d) & 0xffffffff
 
-#Clone original frame, replace payload, let Scapy recalc checksums.
+#clone original frame, replace payload, let Scapy recalc checksums.
 def _fwd(orig, payload, iface):
     p = orig.copy()
     p[Raw].load = payload
@@ -95,21 +95,21 @@ def _fwd(orig, payload, iface):
     p[TCP].chksum = None
     sendp(p, iface=iface, verbose=0)
 
-
+#main calback for every sniffed packet.
 def proc(pkt, iface, host_filter):
     if not pkt.haslayer(Raw) or not pkt.haslayer(TCP):
         return
 
     ip, tcp = pkt[IP], pkt[TCP]
-    fkey    = (ip.src, tcp.sport, ip.dst, tcp.dport)
-    state   = flows[fkey]
-
+    fkey = (ip.src, tcp.sport, ip.dst, tcp.dport)
+    state= flows[fkey]
+   #client → server direction
     if tcp.dport in (80, 8080, 8000):
         payload = str(pkt[Raw].load)
         if host_filter and not any(h.encode() in payload for h in host_filter):
             return
 
-        if HDR_END_RE.search(payload):
+        if HDR_END_RE.search(payload): #first segment w/ headers
             nreq, d = _kill_accept_encoding(payload)
             if d:
                 logging.info("[C→S] stripped Accept-Encoding (%+d bytes)", d)
@@ -121,11 +121,11 @@ def proc(pkt, iface, host_filter):
             _adjust_tcp(tcp, 0, state.s2c_delta)
         _fwd(pkt, payload, iface)
         return
-
+    #server → client direction
     if tcp.sport in (80, 8080, 8000):
         payload = str(pkt[Raw].load)
-
-        if HDR_END_RE.search(payload[:4096]):      # first segment w/ headers
+        #only first segment carries headers
+        if HDR_END_RE.search(payload[:4096]):  #first segment w/ headers
             head, body = payload.split(b"\r\n\r\n", 1)
             nhead, d1  = _rewrite_hdr(head + b"\r\n\r\n")
             nbody, d2  = body, 0

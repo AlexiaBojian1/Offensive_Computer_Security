@@ -152,7 +152,7 @@ class DNSGui(tk.Frame):
             v = lb.get(lb.curselection())
             ent.delete(0, tk.END); ent.insert(0, v)
         lb.bind('<Double-Button-1>', sel)
-        frm = tk.Frame(dlg); frm.pack(pady=5)
+        frm = tok.Frame(dlg); frm.pack(pady=5)
         tk.Button(frm, text='OK', command=lambda: [self.bpf.delete(0, tk.END), self.bpf.insert(0, ent.get()), dlg.destroy()]).pack(side='left', padx=5)
         tk.Button(frm, text='Cancel', command=dlg.destroy).pack(side='left')
 
@@ -163,7 +163,10 @@ class DNSGui(tk.Frame):
         lvl = getattr(logging, self.log_level.get(), logging.INFO)
         self.logger.setLevel(lvl)
         self.log_handler = GUIHandler(self.log_text)
-        self.log_handler.setFormatter(logging.Formatter('%(asctime)s %(message)s'))
+        # match DNS.py logging format: "HH:MM:SS <level initial>: message"
+        self.log_handler.setFormatter(
+            logging.Formatter('%(asctime)s %(levelname).1s: %(message)s', datefmt='%H:%M:%S')
+        )
         self.logger.addHandler(self.log_handler)
 
         iface = self.iface_var.get()

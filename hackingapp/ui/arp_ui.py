@@ -1,3 +1,4 @@
+#!/usr/bin/env python2
 import Tkinter as tk
 import ttk
 import threading
@@ -14,13 +15,17 @@ class ArpSpoofUI(tk.Tk):
         # Interface selection
         tk.Label(self, text="Interface:").grid(row=0, column=0, sticky='e')
         self.iface_var = tk.StringVar()
-        self.iface_combo = ttk.Combobox(self, textvariable=self.iface_var, values=get_if_list())
+        self.iface_combo = ttk.Combobox(
+            self, textvariable=self.iface_var, values=get_if_list()
+        )
         self.iface_combo.grid(row=0, column=1, padx=5, pady=5)
 
         # Mode selection
         tk.Label(self, text="Mode:").grid(row=1, column=0, sticky='e')
         self.mode_var = tk.StringVar(value='pair')
-        self.mode_combo = ttk.Combobox(self, textvariable=self.mode_var, values=['pair', 'silent', 'flood'])
+        self.mode_combo = ttk.Combobox(
+            self, textvariable=self.mode_var, values=['pair', 'silent', 'flood']
+        )
         self.mode_combo.grid(row=1, column=1, padx=5, pady=5)
         self.mode_combo.bind('<<ComboboxSelected>>', self.on_mode_change)
 
@@ -48,7 +53,9 @@ class ArpSpoofUI(tk.Tk):
         # Buttons
         self.start_btn = tk.Button(self, text="Start", command=self.start_attack)
         self.start_btn.grid(row=6, column=0, padx=5, pady=10)
-        self.stop_btn = tk.Button(self, text="Stop", state='disabled', command=self.stop_attack)
+        self.stop_btn = tk.Button(
+            self, text="Stop", state='disabled', command=self.stop_attack
+        )
         self.stop_btn.grid(row=6, column=1, padx=5, pady=10)
 
         # Log output
@@ -67,7 +74,7 @@ class ArpSpoofUI(tk.Tk):
             self.victims_entry.config(state='normal')
             self.gateway_entry.config(state='normal')
             self.cidr_entry.config(state='disabled')
-        else:  # flood
+        else:
             self.victims_entry.config(state='disabled')
             self.gateway_entry.config(state='normal')
             self.cidr_entry.config(state='normal')
@@ -88,11 +95,18 @@ class ArpSpoofUI(tk.Tk):
             return self._log("Error: CIDR and Gateway are required for flood mode.\n")
 
         # point to the shared protocols/arp.py
-        script = os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
-        args = ['sudo', 'python2', script,
-                '-i', iface,
-                '--mode', mode,
-                '--interval', interval]
+        script = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
+        )
+
+        # call directly with capabilities, drop sudo
+        args = [
+            'python2', '-u',  # unbuffered output
+            script,
+            '-i', iface,
+            '--mode', mode,
+            '--interval', interval
+        ]
 
         if mode in ('pair', 'silent'):
             args += ['--victims', victims, '--gateway', gateway]
@@ -104,7 +118,9 @@ class ArpSpoofUI(tk.Tk):
         self.stop_btn.config(state='normal')
 
         def run_process():
-            self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            self.process = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
+            )
             for raw in self.process.stdout:
                 try:
                     self._log(raw.decode('utf-8'))
@@ -113,7 +129,7 @@ class ArpSpoofUI(tk.Tk):
             self._on_process_end()
 
         t = threading.Thread(target=run_process)
-        t.setDaemon(True)
+        t.daemon = True
         t.start()
 
     def _on_process_end(self):

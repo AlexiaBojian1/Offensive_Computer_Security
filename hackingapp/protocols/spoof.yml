@@ -3,6 +3,9 @@ google.com: "10.0.123.5"
 "*.example.org":            # IPv4 only
   - "10.0.123.5"
 
+"*.neverssl.com":            # IPv4 only
+  - "10.0.123.5"  
+
 #"*.example.org-aaaa":       # <--  key you will query with dig -t AAAA
 #  - "fd00:123::5"
 

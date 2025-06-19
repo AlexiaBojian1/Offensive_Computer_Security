@@ -39,12 +39,12 @@ class ArpSpoofUI(tk.Tk):
         self.gateway_entry = tk.Entry(self)
         self.gateway_entry.grid(row=3, column=1, padx=5, pady=5)
 
-        # CIDR entry (for flood mode)
+        # CIDR entry
         tk.Label(self, text="CIDR:").grid(row=4, column=0, sticky='e')
         self.cidr_entry = tk.Entry(self)
         self.cidr_entry.grid(row=4, column=1, padx=5, pady=5)
 
-        # Interval
+        # Interval entry
         tk.Label(self, text="Interval (s):").grid(row=5, column=0, sticky='e')
         self.interval_entry = tk.Entry(self)
         self.interval_entry.insert(0, '10')
@@ -65,7 +65,6 @@ class ArpSpoofUI(tk.Tk):
         scrollbar.grid(row=7, column=2, sticky='nsew')
         self.log_text['yscrollcommand'] = scrollbar.set
 
-        # initialize field states
         self.on_mode_change()
 
     def on_mode_change(self, event=None):
@@ -80,8 +79,8 @@ class ArpSpoofUI(tk.Tk):
             self.cidr_entry.config(state='normal')
 
     def start_attack(self):
-        iface    = self.iface_var.get().strip()
-        mode     = self.mode_var.get()
+        iface = self.iface_var.get().strip()
+        mode  = self.mode_var.get()
         interval = self.interval_entry.get().strip()
         gateway  = self.gateway_entry.get().strip()
         victims  = self.victims_entry.get().strip()
@@ -94,20 +93,10 @@ class ArpSpoofUI(tk.Tk):
         if mode == 'flood' and (not cidr or not gateway):
             return self._log("Error: CIDR and Gateway are required for flood mode.\n")
 
-        # point to the shared protocols/arp.py
         script = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
         )
-
-        # call directly with capabilities, drop sudo
-        args = [
-            'python2', '-u',  # unbuffered output
-            script,
-            '-i', iface,
-            '--mode', mode,
-            '--interval', interval
-        ]
-
+        args = ['python2', '-u', script, '-i', iface, '--mode', mode, '--interval', interval]
         if mode in ('pair', 'silent'):
             args += ['--victims', victims, '--gateway', gateway]
         else:
@@ -118,14 +107,24 @@ class ArpSpoofUI(tk.Tk):
         self.stop_btn.config(state='normal')
 
         def run_process():
-            self.process = subprocess.Popen(
-                args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
-            )
-            for raw in self.process.stdout:
-                try:
-                    self._log(raw.decode('utf-8'))
-                except:
-                    self._log(str(raw))
+            try:
+                self.process = subprocess.Popen(
+                    args,
+                    cwd=os.path.dirname(script),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,   # ← merge stderr into stdout
+                    bufsize=1,
+                    universal_newlines=True
+                )
+            except Exception as e:
+                self._log("Failed to start arp.py: {}\n".format(e))
+                self._on_process_end()
+                return
+
+            for line in iter(self.process.stdout.readline, ''):
+                self._log(line)
+            self.process.stdout.close()
+            self.process.wait()
             self._on_process_end()
 
         t = threading.Thread(target=run_process)
@@ -140,7 +139,7 @@ class ArpSpoofUI(tk.Tk):
 
     def stop_attack(self):
         if self.process:
-            self.process.terminate()
+            self.process.send_signal(subprocess.signal.SIGINT)
             self._log("\nAttack stopped. Restoring caches...\n")
         self.start_btn.config(state='normal')
         self.stop_btn.config(state='disabled')

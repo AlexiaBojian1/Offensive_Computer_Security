@@ -66,13 +66,18 @@ class DNSGui(tk.Frame):
         self.log_handler = None
         self.logger = logging.getLogger()
         self.logger.setLevel(logging.INFO)
+
         self._build_widgets()
 
     def _build_widgets(self):
         r = 0
         tk.Label(self, text='Interface:').grid(row=r, column=0, sticky='e')
         self.iface_var = tk.StringVar()
-        tk.OptionMenu(self, self.iface_var, *get_if_list()).grid(row=r, column=1, sticky='w')
+        # default to first interface
+        ifs = get_if_list()
+        if ifs:
+            self.iface_var.set(ifs[0])
+        tk.OptionMenu(self, self.iface_var, *ifs).grid(row=r, column=1, sticky='w')
 
         r += 1
         tk.Label(self, text='Mapping file:').grid(row=r, column=0, sticky='e')
@@ -121,7 +126,11 @@ class DNSGui(tk.Frame):
         self._text_row = r
         self.rowconfigure(self._text_row, weight=1)
         self.log_text = tk.Text(self)
-        self.log_text.grid(row=r, column=0, columnspan=3, sticky='nsew')
+        self.log_text.grid(row=r, column=0, columnspan=2, sticky='nsew')
+        # add vertical scrollbar for log output
+        scrollbar = tk.Scrollbar(self, orient='vertical', command=self.log_text.yview)
+        scrollbar.grid(row=r, column=2, sticky='ns')
+        self.log_text.configure(yscrollcommand=scrollbar.set)
 
     def _browse_map(self):
         p = filedialog.askopenfilename(filetypes=[('YAML','*.yml'),('All files','*.*')])

@@ -51,7 +51,7 @@ def craft(is_at_mac, dst_ip, dst_mac, src_ip):
 def resolve_mac(ip):
     mac = getmacbyip(ip)
     if not mac:
-        raise RuntimeError("Could not resolve MAC for %s - host down?" % ip)
+        raise RuntimeError("Could not resolve MAC for %s – host down?" % ip)
     return mac
 
 #ActivePairSpoofer:thread that continuously poisons one <victim, gateway> pair

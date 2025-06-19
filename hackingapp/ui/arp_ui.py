@@ -2,7 +2,7 @@ import Tkinter as tk
 import ttk
 import threading
 import subprocess
-import sys
+import os
 from scapy.all import get_if_list
 
 class ArpSpoofUI(tk.Tk):
@@ -14,8 +14,7 @@ class ArpSpoofUI(tk.Tk):
         # Interface selection
         tk.Label(self, text="Interface:").grid(row=0, column=0, sticky='e')
         self.iface_var = tk.StringVar()
-        ifaces = get_if_list()
-        self.iface_combo = ttk.Combobox(self, textvariable=self.iface_var, values=ifaces)
+        self.iface_combo = ttk.Combobox(self, textvariable=self.iface_var, values=get_if_list())
         self.iface_combo.grid(row=0, column=1, padx=5, pady=5)
 
         # Mode selection
@@ -74,26 +73,27 @@ class ArpSpoofUI(tk.Tk):
             self.cidr_entry.config(state='normal')
 
     def start_attack(self):
-        # validate inputs
-        iface = self.iface_var.get().strip()
-        mode = self.mode_var.get()
+        iface    = self.iface_var.get().strip()
+        mode     = self.mode_var.get()
         interval = self.interval_entry.get().strip()
-        gateway = self.gateway_entry.get().strip()
-        victims = self.victims_entry.get().strip()
-        cidr = self.cidr_entry.get().strip()
+        gateway  = self.gateway_entry.get().strip()
+        victims  = self.victims_entry.get().strip()
+        cidr     = self.cidr_entry.get().strip()
 
         if not iface:
-            self._log("Error: Interface not selected.\n")
-            return
+            return self._log("Error: Interface not selected.\n")
         if mode in ('pair', 'silent') and (not victims or not gateway):
-            self._log("Error: Victims and Gateway are required for this mode.\n")
-            return
+            return self._log("Error: Victims and Gateway are required for this mode.\n")
         if mode == 'flood' and (not cidr or not gateway):
-            self._log("Error: CIDR and Gateway are required for flood mode.\n")
-            return
+            return self._log("Error: CIDR and Gateway are required for flood mode.\n")
 
-        # adjust to use arp.py from latest script
-        args = ['sudo', 'python2', 'arp.py', '-i', iface, '--mode', mode, '--interval', interval]
+        # point to the shared protocols/arp.py
+        script = os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
+        args = ['sudo', 'python2', script,
+                '-i', iface,
+                '--mode', mode,
+                '--interval', interval]
+
         if mode in ('pair', 'silent'):
             args += ['--victims', victims, '--gateway', gateway]
         else:
@@ -105,20 +105,16 @@ class ArpSpoofUI(tk.Tk):
 
         def run_process():
             self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            while True:
-                line = self.process.stdout.readline()
-                if not line:
-                    break
-                # ensure unicode display
+            for raw in self.process.stdout:
                 try:
-                    self._log(line.decode('utf-8'))
+                    self._log(raw.decode('utf-8'))
                 except:
-                    self._log(str(line))
+                    self._log(str(raw))
             self._on_process_end()
 
-        thread = threading.Thread(target=run_process)
-        thread.setDaemon(True)
-        thread.start()
+        t = threading.Thread(target=run_process)
+        t.setDaemon(True)
+        t.start()
 
     def _on_process_end(self):
         self._log("\nProcess ended.\n")

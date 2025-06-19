@@ -99,10 +99,15 @@ class ArpSpoofUI(tk.Tk):
             os.path.join(os.path.dirname(__file__), '..', 'protocols', 'arp.py')
         )
 
-        # build command to run unbuffered
-        args = [script, '-i', iface,
-                '--mode', mode,
-                '--interval', interval]
+        # call directly with capabilities, drop sudo
+        args = [
+            'python2', '-u',  # unbuffered output
+            script,
+            '-i', iface,
+            '--mode', mode,
+            '--interval', interval
+        ]
+
         if mode in ('pair', 'silent'):
             args += ['--victims', victims, '--gateway', gateway]
         else:
@@ -113,18 +118,14 @@ class ArpSpoofUI(tk.Tk):
         self.stop_btn.config(state='normal')
 
         def run_process():
-            # open with line-buffering & capture both stdout and stderr
             self.process = subprocess.Popen(
-                ['python2', '-u'] + args,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                bufsize=1,
-                universal_newlines=True
+                args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT
             )
-            for line in self.process.stdout:
-                self._log(line)
-            self.process.stdout.close()
-            self.process.wait()
+            for raw in self.process.stdout:
+                try:
+                    self._log(raw.decode('utf-8'))
+                except:
+                    self._log(str(raw))
             self._on_process_end()
 
         t = threading.Thread(target=run_process)
@@ -139,7 +140,7 @@ class ArpSpoofUI(tk.Tk):
 
     def stop_attack(self):
         if self.process:
-            self.process.send_signal(subprocess.signal.SIGINT)
+            self.process.terminate()
             self._log("\nAttack stopped. Restoring caches...\n")
         self.start_btn.config(state='normal')
         self.stop_btn.config(state='disabled')

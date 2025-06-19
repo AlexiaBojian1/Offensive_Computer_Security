@@ -5,9 +5,9 @@ arp.py – ARP-cache poisoning tool (Python-2.7 + Scapy 2.4.x)
 
 Modes
 -----
-pair   : periodic poisoning of one or more <victim, gateway> pairs (default)
-silent : reply only to ARP who-has packets (stealthy)
-flood  : broadcast forged replies for every IP inside a CIDR
+pair: periodic poisoning of one or more <victim, gateway> pairs (default)
+silent: reply only to ARP who-has packets (stealthy)
+flood: broadcast forged replies for every IP inside a CIDR
 
 Run “sudo python2 arp.py -h” for full CLI help and example commands.
 """

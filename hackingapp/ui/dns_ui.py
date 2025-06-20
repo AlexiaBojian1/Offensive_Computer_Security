@@ -127,7 +127,6 @@ class DNSGui(tk.Frame):
         self.rowconfigure(self._text_row, weight=1)
         self.log_text = tk.Text(self)
         self.log_text.grid(row=r, column=0, columnspan=2, sticky='nsew')
-        # add vertical scrollbar for log output
         scrollbar = tk.Scrollbar(self, orient='vertical', command=self.log_text.yview)
         scrollbar.grid(row=r, column=2, sticky='ns')
         self.log_text.configure(yscrollcommand=scrollbar.set)
@@ -152,7 +151,7 @@ class DNSGui(tk.Frame):
             v = lb.get(lb.curselection())
             ent.delete(0, tk.END); ent.insert(0, v)
         lb.bind('<Double-Button-1>', sel)
-        frm = tok.Frame(dlg); frm.pack(pady=5)
+        frm = tk.Frame(dlg); frm.pack(pady=5)
         tk.Button(frm, text='OK', command=lambda: [self.bpf.delete(0, tk.END), self.bpf.insert(0, ent.get()), dlg.destroy()]).pack(side='left', padx=5)
         tk.Button(frm, text='Cancel', command=dlg.destroy).pack(side='left')
 
@@ -190,7 +189,9 @@ class DNSGui(tk.Frame):
         self.logger.info('Configuration:')
         self.logger.info('  BPF filter: %s', self.bpf.get())
         self.logger.info('  TTL: %s seconds', self.ttl.get())
-        self.logger.info('  Relay unmatched: %s', self.relay_var.get())
+        # Only log relay status if enabled
+        if self.relay_var.get():
+            self.logger.info('  Relay unmatched: %s', self.relay_var.get())
         self.logger.info('  Upstream DNS: %s', self.upstream.get())
         self.logger.info('  Log level: %s', self.log_level.get())
         self.logger.info('Started on %s', iface)

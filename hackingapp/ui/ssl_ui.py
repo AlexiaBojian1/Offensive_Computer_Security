@@ -4,18 +4,22 @@ try:
 except ImportError:
     import tkinter as tk
     from tkinter import ttk
+
 import threading
 import subprocess
+import queue
 from scapy.all import get_if_list
 import os
-from datetime import datetime
 
 class SSLStripUI(tk.Tk):
     def __init__(self):
-        # Initialize base Tk class explicitly (avoids super() issues in Python 2)
         tk.Tk.__init__(self)
         self.title("SSL Strip Tool UI")
         self.process = None
+
+        # queue for thread-safe logging
+        self._line_queue = queue.Queue()
+        self.after(100, self._poll_log_queue)
 
         # Interface selection
         tk.Label(self, text="Interface:").grid(row=0, column=0, sticky='e')
@@ -27,8 +31,7 @@ class SSLStripUI(tk.Tk):
         # BPF filter entry
         tk.Label(self, text="BPF Filter:").grid(row=1, column=0, sticky='e')
         self.bpf_entry = tk.Entry(self)
-        # Leave blank to use default tcp port 80
-        self.bpf_entry.insert(0, '')
+        self.bpf_entry.insert(0, '')  # default blank → port 80
         self.bpf_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # Host filter entry
@@ -88,36 +91,48 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Launch inline, capturing stdout/stderr
-        cmd_str = None
         try:
             cmd_str = subprocess.list2cmdline(args)
         except AttributeError:
             cmd_str = ' '.join(args)
-        self._log("Starting: %s" % cmd_str)
-        # Manually log ssl.py startup info so GUI shows the initial [I] SSL-strip line
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        # Determine log level prefix: DEBUG -> D, INFO -> I, ERROR -> E
-        level = 'D' if verbose else ('E' if quiet else 'I')
-        filter_str = bpf if bpf else 'tcp port 80'
-        self._log(f"{timestamp} [{level}] SSL-strip on {iface}   filter=\"{filter_str}\"")
-        self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self._log(f"Starting: {cmd_str}\n")
+
+        # Start the subprocess, line-buffered text mode
+        self.process = subprocess.Popen(
+            args,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            bufsize=1,
+            universal_newlines=True
+        )
 
         def run_proc():
-            for raw in self.process.stdout:
-                try:
-                    line = raw.decode('utf-8')
-                except:
-                    line = str(raw)
-                self._log(line)
-            self._on_end()
+            for line in self.process.stdout:
+                # enqueue each line for the main thread to pick up
+                self._line_queue.put(line)
+            # signal end of process
+            self._line_queue.put(None)
 
-        t = threading.Thread(target=run_proc)
-        t.daemon = True
+        t = threading.Thread(target=run_proc, daemon=True)
         t.start()
 
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
+
+    def _poll_log_queue(self):
+        """Called in main thread via after(); flushes the line queue."""
+        try:
+            while True:
+                line = self._line_queue.get_nowait()
+                if line is None:
+                    self._on_end()
+                else:
+                    self._log(line)
+        except queue.Empty:
+            pass
+        finally:
+            # schedule next poll
+            self.after(100, self._poll_log_queue)
 
     def stop_strip(self):
         if self.process:
@@ -135,6 +150,7 @@ class SSLStripUI(tk.Tk):
     def _log(self, msg):
         self.log_text.insert(tk.END, msg)
         self.log_text.see(tk.END)
+
 
 if __name__ == '__main__':
     app = SSLStripUI()

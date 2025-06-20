@@ -88,7 +88,7 @@ class SSLStripUI(tk.Tk):
             self._log("Error: Interface must be selected.\n")
             return
 
-        # build the ssl.py command
+        # Build the ssl.py command
         script_path = os.path.join(os.path.dirname(__file__),
                                    '..', 'protocols', 'ssl.py')
         args = ['sudo', 'python2', '-u', script_path, '-i', iface]
@@ -99,14 +99,14 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # pretty-print the cmd
+        # Pretty-print the cmd
         try:
             cmd_str = subprocess.list2cmdline(args)
         except AttributeError:
             cmd_str = ' '.join(args)
         self._log("Starting: %s\n" % cmd_str)
 
-        # spawn the process in text mode, line-buffered
+        # Spawn the process in text mode, line-buffered
         self.process = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
@@ -115,11 +115,15 @@ class SSLStripUI(tk.Tk):
             universal_newlines=True
         )
 
+        # Immediately echo the SSL-strip banner into the UI:
+        default_filter = bpf if bpf else 'tcp port 80'
+        self._log("[I] SSL-strip on %s filter=\"%s\"\n" % (iface, default_filter))
+
         def run_proc():
             for line in self.process.stdout:
-                # enqueue each line for the GUI thread
+                # Enqueue each line for the GUI thread
                 self._line_queue.put(line)
-            # signal “done”
+            # Signal “done”
             self._line_queue.put(None)
 
         t = threading.Thread(target=run_proc)

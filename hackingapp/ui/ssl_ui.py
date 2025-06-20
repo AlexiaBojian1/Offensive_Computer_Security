@@ -100,7 +100,7 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Pretty-print the cmd
+        # show the invocation
         try:
             cmd_str = subprocess.list2cmdline(args)
         except AttributeError:
@@ -116,15 +116,11 @@ class SSLStripUI(tk.Tk):
             universal_newlines=True
         )
 
-        # Immediately echo the SSL-strip banner into the UI:
-        default_filter = bpf if bpf else 'tcp port 80'
-        self._log("[I] SSL-strip on %s filter=\"%s\"\n" % (iface, default_filter))
-
+        # start a thread to read its real output (including its own banner)
         def run_proc():
             for line in self.process.stdout:
-                # Enqueue each line for the GUI thread
+                # enqueue each real line from ssl.py
                 self._line_queue.put(line)
-            # Signal “done”
             self._line_queue.put(None)
 
         t = threading.Thread(target=run_proc)
@@ -136,8 +132,7 @@ class SSLStripUI(tk.Tk):
 
     def _poll_log_queue(self):
         """
-        Runs every 100 ms in the main thread, pulls any
-        lines from the queue and logs them.
+        Every 100 ms on the main thread, flush queued lines into the Text widget.
         """
         try:
             while True:
@@ -165,7 +160,7 @@ class SSLStripUI(tk.Tk):
         self.process = None
 
     def _log(self, msg):
-        """Insert a timestamped message (HH:MM:SS) into the log text widget."""
+        """Prefix with HH:MM:SS and insert into the log."""
         ts = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert(tk.END, "[%s] %s" % (ts, msg))
         self.log_text.see(tk.END)

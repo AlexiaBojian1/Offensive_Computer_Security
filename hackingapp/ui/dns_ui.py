@@ -49,7 +49,6 @@ class GUIHandler(logging.Handler):
 
 
 class DNSGui(tk.Frame):
-    # Removed the 10.0.0.0/8 preset per user request
     BPF_PRESETS = [
         'udp or tcp port 53',
         'dst port 53 and src host 192.168.1.100',
@@ -73,7 +72,6 @@ class DNSGui(tk.Frame):
         r = 0
         tk.Label(self, text='Interface:').grid(row=r, column=0, sticky='e')
         self.iface_var = tk.StringVar()
-        # default to first interface
         ifs = get_if_list()
         if ifs:
             self.iface_var.set(ifs[0])
@@ -162,7 +160,6 @@ class DNSGui(tk.Frame):
         lvl = getattr(logging, self.log_level.get(), logging.INFO)
         self.logger.setLevel(lvl)
         self.log_handler = GUIHandler(self.log_text)
-        # match DNS.py logging format: "HH:MM:SS <level initial>: message"
         self.log_handler.setFormatter(
             logging.Formatter('%(asctime)s %(levelname).1s: %(message)s', datefmt='%H:%M:%S')
         )
@@ -189,7 +186,6 @@ class DNSGui(tk.Frame):
         self.logger.info('Configuration:')
         self.logger.info('  BPF filter: %s', self.bpf.get())
         self.logger.info('  TTL: %s seconds', self.ttl.get())
-        # Only log relay status if enabled
         if self.relay_var.get():
             self.logger.info('  Relay unmatched: %s', self.relay_var.get())
         self.logger.info('  Upstream DNS: %s', self.upstream.get())

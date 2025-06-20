@@ -89,7 +89,7 @@ class SSLStripUI(tk.Tk):
             self._log("Error: Interface must be selected.\n")
             return
 
-        # build ssl.py invocation
+        # build ssl.py 
         script_path = os.path.join(os.path.dirname(__file__),
                                    '..', 'protocols', 'ssl.py')
         args = ['sudo', 'python2', '-u', script_path, '-i', iface]

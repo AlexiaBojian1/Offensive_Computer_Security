@@ -73,7 +73,7 @@ def _rewrite_hdr(resp):
 
 #Replace every https:// and every <a href="https://…"> etc.
 def _rewrite_body(body):
-    logging.warning("[DEBUG] Entered _rewrite_body with %d bytes", len(body))
+    logging.info("[DEBUG] Entered _rewrite_body with %d bytes", len(body))
     logging.debug("Original body:\n%s", body)
     nb = TAG_RE.sub(lambda m: m.group(1) + b'="http://', body)
     nb = HTTPS_RE.sub(b"http://", nb)
@@ -129,18 +129,18 @@ def proc(pkt, iface, host_filter):
         return
     #server → client direction
     if tcp.sport in (80, 8080, 8000):
-        logging.warning("enttered")
+        logging.info("enttered")
         payload = str(pkt[Raw].load)
         #only first segment carries headers
         if HDR_END_RE.search(payload[:4096]):  #first segment w/ headers
-            logging.warning("[DEBUG] Server → Client: processing possible HTTP response")
+            logging.info("[DEBUG] Server → Client: processing possible HTTP response")
             head, body = payload.split(b"\r\n\r\n", 1)
             nhead, d1  = _rewrite_hdr(head + b"\r\n\r\n")
             nbody, d2  = body, 0
             content_type = next((line for line in head.lower().split(b"\r\n") if line.startswith(b"content-type:")), b"")
             if body and len(body) <= BODY_CAP and b"text" in content_type:
                 nbody, d2 = _rewrite_body(body)
-                logging.warning("[DEBUG] exited _rewrite_body with %d bytes", len(body))
+                logging.info("[DEBUG] exited _rewrite_body with %d bytes", len(body))
                 
             delta = d1 + d2
             if delta:

@@ -73,8 +73,10 @@ def _rewrite_hdr(resp):
 
 #Replace every https:// and every <a href="https://…"> etc.
 def _rewrite_body(body):
+    logging.info("body before", body)
     nb = HTTPS_RE.sub(b"http://", body)
     nb = TAG_RE.sub(lambda m: m.group(1) + b'="http://', nb)
+    logging.info("after body", nb)
     return nb, len(nb) - len(body)
 
 #Apply running delta so TCP sequence numbers stay in sync.

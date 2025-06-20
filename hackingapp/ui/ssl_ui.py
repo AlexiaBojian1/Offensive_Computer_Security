@@ -83,26 +83,39 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Launch in new terminal (preserve output)
+        # Try launching in terminal emulator
         term = os.environ.get('TERMINAL', 'xterm')
         term_cmd = [term, '-hold', '-e'] + args
         try:
             cmd_str = subprocess.list2cmdline(term_cmd)
-        except AttributeError:
-            cmd_str = ' '.join(term_cmd)
-        self._log("Launching in terminal: %s\n" % cmd_str)
+            self._log("Launching in terminal: %s\n" % cmd_str)
+            self.process = subprocess.Popen(term_cmd)
+            # Monitor exit
+            def wait_term():
+                self.process.wait()
+                self._on_end()
+            t_term = threading.Thread(target=wait_term)
+            t_term.daemon = True
+            t_term.start()
+        except (OSError, AttributeError):
+            # Terminal not found or list2cmdline missing: fallback to in-GUI logging
+            self._log("Terminal launch failed; running inline.\n")
+            self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            # Read output into GUI
+            def run_proc():
+                for raw in self.process.stdout:
+                    try:
+                        line = raw.decode('utf-8')
+                    except:
+                        line = str(raw)
+                    self._log(line)
+                self._on_end()
+            t = threading.Thread(target=run_proc)
+            t.daemon = True
+            t.start()
 
-        self.process = subprocess.Popen(term_cmd)
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
-
-        # Monitor process exit
-        def wait_proc():
-            self.process.wait()
-            self._on_end()
-        t = threading.Thread(target=wait_proc)
-        t.setDaemon(True)
-        t.start()
 
     def stop_strip(self):
         if self.process:

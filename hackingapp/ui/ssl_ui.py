@@ -71,9 +71,9 @@ class SSLStripUI(tk.Tk):
             self._log("Error: Interface must be selected.\n")
             return
 
-        # Build ssl.py command
+        # Build ssl.py command with unbuffered output (-u)
         script_path = os.path.join(os.path.dirname(__file__), '..', 'protocols', 'ssl.py')
-        args = ['sudo', 'python2', script_path, '-i', iface]
+        args = ['sudo', 'python2', '-u', script_path, '-i', iface]
         if bpf:
             args += ['--bpf', bpf]
         if hosts:
@@ -83,36 +83,27 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Try launching in terminal emulator
-        term = os.environ.get('TERMINAL', 'xterm')
-        term_cmd = [term, '-hold', '-e'] + args
+        # Launch inline, capturing stdout/stderr
+        cmd_str = None
         try:
-            cmd_str = subprocess.list2cmdline(term_cmd)
-            self._log("Launching in terminal: %s\n" % cmd_str)
-            self.process = subprocess.Popen(term_cmd)
-            # Monitor exit
-            def wait_term():
-                self.process.wait()
-                self._on_end()
-            t_term = threading.Thread(target=wait_term)
-            t_term.daemon = True
-            t_term.start()
-        except (OSError, AttributeError):
-            # Terminal not found or list2cmdline missing: fallback to in-GUI logging
-            self._log("Terminal launch failed; running inline.\n")
-            self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            # Read output into GUI
-            def run_proc():
-                for raw in self.process.stdout:
-                    try:
-                        line = raw.decode('utf-8')
-                    except:
-                        line = str(raw)
-                    self._log(line)
-                self._on_end()
-            t = threading.Thread(target=run_proc)
-            t.daemon = True
-            t.start()
+            cmd_str = subprocess.list2cmdline(args)
+        except AttributeError:
+            cmd_str = ' '.join(args)
+        self._log("Starting: %s\n" % cmd_str)
+        self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        def run_proc():
+            for raw in self.process.stdout:
+                try:
+                    line = raw.decode('utf-8')
+                except:
+                    line = str(raw)
+                self._log(line)
+            self._on_end()
+
+        t = threading.Thread(target=run_proc)
+        t.daemon = True
+        t.start()
 
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')

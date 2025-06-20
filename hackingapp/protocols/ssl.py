@@ -128,7 +128,8 @@ def proc(pkt, iface, host_filter):
         _fwd(pkt, payload, iface)
         return
     #server → client direction
-    if tcp.sport in (443, 80, 8080, 8000):
+    if tcp.sport in (80, 8080, 8000):
+        logging.warning("enttered")
         payload = str(pkt[Raw].load)
         #only first segment carries headers
         if HDR_END_RE.search(payload[:4096]):  #first segment w/ headers

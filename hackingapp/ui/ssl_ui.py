@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 try:
     import Tkinter as tk
     import ttk
@@ -155,3 +156,4 @@ class SSLStripUI(tk.Tk):
 if __name__ == '__main__':
     app = SSLStripUI()
     app.mainloop()
+

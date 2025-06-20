@@ -1,9 +1,14 @@
-import Tkinter as tk
-import ttk
+try:
+    import Tkinter as tk
+    import ttk
+except ImportError:
+    import tkinter as tk
+    from tkinter import ttk
 import threading
 import subprocess
 from scapy.all import get_if_list
 import os
+from datetime import datetime
 
 class SSLStripUI(tk.Tk):
     def __init__(self):

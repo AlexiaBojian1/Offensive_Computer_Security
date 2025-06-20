@@ -144,7 +144,6 @@ def proc(pkt, iface, host_filter):
                 
             delta = d1 + d2
             if delta:
-                nbody, d2 = _rewrite_body(body)
                 logging.info("[S→C] rewrote %-15s (%+d bytes)", ip.dst, delta)
                 state.s2c_delta += delta
                 _adjust_tcp(tcp, 0, state.c2s_delta)

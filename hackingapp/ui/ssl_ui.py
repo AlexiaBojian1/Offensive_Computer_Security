@@ -89,37 +89,42 @@ class SSLStripUI(tk.Tk):
             self._log("Error: Interface must be selected.\n")
             return
 
-        # Build the ssl.py command
+        # build ssl.py invocation
         script_path = os.path.join(os.path.dirname(__file__),
                                    '..', 'protocols', 'ssl.py')
         args = ['sudo', 'python2', '-u', script_path, '-i', iface]
-        if bpf:   args += ['--bpf', bpf]
-        if hosts: args += ['--hosts', hosts]
+        if bpf:    args += ['--bpf', bpf]
+        if hosts:  args += ['--hosts', hosts]
         if verbose:
             args.append('-v')
         elif quiet:
             args.append('-q')
 
-        # show the invocation
+        # show the command we launched
         try:
             cmd_str = subprocess.list2cmdline(args)
         except AttributeError:
             cmd_str = ' '.join(args)
         self._log("Starting: %s\n" % cmd_str)
 
-        # Spawn the process in text mode, line-buffered
+        # spawn it in completely unbuffered binary mode
         self.process = subprocess.Popen(
             args,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            bufsize=1,
-            universal_newlines=True
+            bufsize=0
         )
 
-        # start a thread to read its real output (including its own banner)
+        # reader thread: grab each real line from ssl.py
         def run_proc():
-            for line in self.process.stdout:
-                # enqueue each real line from ssl.py
+            while True:
+                raw = self.process.stdout.readline()
+                if not raw:
+                    break
+                try:
+                    line = raw.decode('utf-8')
+                except:
+                    line = raw
                 self._line_queue.put(line)
             self._line_queue.put(None)
 
@@ -131,9 +136,7 @@ class SSLStripUI(tk.Tk):
         self.stop_btn.config(state='normal')
 
     def _poll_log_queue(self):
-        """
-        Every 100 ms on the main thread, flush queued lines into the Text widget.
-        """
+        """Runs every 100ms on the GUI thread, flushes the queue into the Text widget."""
         try:
             while True:
                 line = self._line_queue.get_nowait()
@@ -160,7 +163,7 @@ class SSLStripUI(tk.Tk):
         self.process = None
 
     def _log(self, msg):
-        """Prefix with HH:MM:SS and insert into the log."""
+        """Insert a timestamped (HH:MM:SS) message into the log."""
         ts = datetime.now().strftime("%H:%M:%S")
         self.log_text.insert(tk.END, "[%s] %s" % (ts, msg))
         self.log_text.see(tk.END)

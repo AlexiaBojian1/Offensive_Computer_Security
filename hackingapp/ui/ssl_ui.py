@@ -18,6 +18,7 @@ import threading
 import subprocess
 from scapy.all import get_if_list
 import os
+from datetime import datetime
 
 class SSLStripUI(tk.Tk):
     def __init__(self):
@@ -164,7 +165,9 @@ class SSLStripUI(tk.Tk):
         self.process = None
 
     def _log(self, msg):
-        self.log_text.insert(tk.END, msg)
+        """Insert a timestamped message (HH:MM:SS) into the log text widget."""
+        ts = datetime.now().strftime("%H:%M:%S")
+        self.log_text.insert(tk.END, "[%s] %s" % (ts, msg))
         self.log_text.see(tk.END)
 
 

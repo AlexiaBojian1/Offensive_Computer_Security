@@ -111,7 +111,7 @@ def proc(pkt, iface, host_filter):
     state= flows[fkey]
    #client → server direction
     if tcp.dport in (80, 8080, 8000):
-        payload = str(pkt[Raw].load)
+        payload = pkt[Raw].load
         head, body = payload.split(b"\r\n\r\n", 1)
         nbody, d2 = _rewrite_body(body)
         if host_filter and not any(h.encode() in payload for h in host_filter):

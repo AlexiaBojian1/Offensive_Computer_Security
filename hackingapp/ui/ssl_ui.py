@@ -7,7 +7,8 @@ import os
 
 class SSLStripUI(tk.Tk):
     def __init__(self):
-        super(SSLStripUI, self).__init__()
+        # Initialize base Tk class explicitly (avoids super() issues in Python 2)
+        tk.Tk.__init__(self)
         self.title("SSL Strip Tool UI")
         self.process = None
 
@@ -30,7 +31,7 @@ class SSLStripUI(tk.Tk):
         self.hosts_entry = tk.Entry(self)
         self.hosts_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        # Verbose / Quiet
+        # Verbose / Quiet toggles
         self.verbose_var = tk.BooleanVar()
         self.quiet_var = tk.BooleanVar()
         tk.Checkbutton(self, text="Verbose (-v)", variable=self.verbose_var,
@@ -38,13 +39,13 @@ class SSLStripUI(tk.Tk):
         tk.Checkbutton(self, text="Quiet (-q)", variable=self.quiet_var,
                        command=self.on_quiet_toggle).grid(row=3, column=1)
 
-        # Buttons
+        # Control buttons
         self.start_btn = tk.Button(self, text="Start", command=self.start_strip)
         self.start_btn.grid(row=4, column=0, padx=5, pady=10)
         self.stop_btn = tk.Button(self, text="Stop", state='disabled', command=self.stop_strip)
         self.stop_btn.grid(row=4, column=1, padx=5, pady=10)
 
-        # Log output
+        # Log display
         self.log_text = tk.Text(self, height=15, width=60)
         self.log_text.grid(row=5, column=0, columnspan=2, padx=5, pady=5)
         scrollbar = tk.Scrollbar(self, command=self.log_text.yview)
@@ -82,7 +83,7 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Launch in new terminal so output stays visible
+        # Launch in new terminal (preserve output)
         term = os.environ.get('TERMINAL', 'xterm')
         term_cmd = [term, '-hold', '-e'] + args
         try:
@@ -91,17 +92,16 @@ class SSLStripUI(tk.Tk):
             cmd_str = ' '.join(term_cmd)
         self._log("Launching in terminal: %s\n" % cmd_str)
 
-        # Start process
         self.process = subprocess.Popen(term_cmd)
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
 
-        # Monitor exit
+        # Monitor process exit
         def wait_proc():
             self.process.wait()
             self._on_end()
         t = threading.Thread(target=wait_proc)
-        t.daemon = True
+        t.setDaemon(True)
         t.start()
 
     def stop_strip(self):

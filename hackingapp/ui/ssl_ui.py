@@ -94,8 +94,14 @@ class SSLStripUI(tk.Tk):
             cmd_str = subprocess.list2cmdline(args)
         except AttributeError:
             cmd_str = ' '.join(args)
-        self._log("Starting: %s\n" % cmd_str)
-        self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        self._log("Starting: %s" % cmd_str)
+        # Manually log ssl.py startup info so GUI shows the initial [I] SSL-strip line
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        # Determine log level prefix: DEBUG -> D, INFO -> I, ERROR -> E
+        level = 'D' if verbose else ('E' if quiet else 'I')
+        filter_str = bpf if bpf else 'tcp port 80'
+        self._log(f"{timestamp} [{level}] SSL-strip on {iface}   filter=\"{filter_str}\"")
+        self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
         def run_proc():
             for raw in self.process.stdout:

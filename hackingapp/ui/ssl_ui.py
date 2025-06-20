@@ -7,7 +7,7 @@ import os
 
 class SSLStripUI(tk.Tk):
     def __init__(self):
-        tk.Tk.__init__(self)
+        super(SSLStripUI, self).__init__()
         self.title("SSL Strip Tool UI")
         self.process = None
 
@@ -21,7 +21,7 @@ class SSLStripUI(tk.Tk):
         # BPF filter entry
         tk.Label(self, text="BPF Filter:").grid(row=1, column=0, sticky='e')
         self.bpf_entry = tk.Entry(self)
-        # Leave blank to use script default filter
+        # Leave blank to use default tcp port 80
         self.bpf_entry.insert(0, '')
         self.bpf_entry.grid(row=1, column=1, padx=5, pady=5)
 
@@ -30,7 +30,7 @@ class SSLStripUI(tk.Tk):
         self.hosts_entry = tk.Entry(self)
         self.hosts_entry.grid(row=2, column=1, padx=5, pady=5)
 
-        # Verbose / Quiet (mutually exclusive)
+        # Verbose / Quiet
         self.verbose_var = tk.BooleanVar()
         self.quiet_var = tk.BooleanVar()
         tk.Checkbutton(self, text="Verbose (-v)", variable=self.verbose_var,
@@ -70,14 +70,11 @@ class SSLStripUI(tk.Tk):
             self._log("Error: Interface must be selected.\n")
             return
 
-        # Build command for ssl.py (in ../protocols/)
+        # Build ssl.py command
         script_path = os.path.join(os.path.dirname(__file__), '..', 'protocols', 'ssl.py')
         args = ['sudo', 'python2', script_path, '-i', iface]
-
-        # Only include BPF filter if provided
         if bpf:
             args += ['--bpf', bpf]
-
         if hosts:
             args += ['--hosts', hosts]
         if verbose:
@@ -85,28 +82,26 @@ class SSLStripUI(tk.Tk):
         elif quiet:
             args.append('-q')
 
-        # Log the exact command executed (compatible with Python 2)
+        # Launch in new terminal so output stays visible
+        term = os.environ.get('TERMINAL', 'xterm')
+        term_cmd = [term, '-hold', '-e'] + args
         try:
-            cmd_str = subprocess.list2cmdline(args)
+            cmd_str = subprocess.list2cmdline(term_cmd)
         except AttributeError:
-            cmd_str = ' '.join(args)
-        self._log("Starting: %s\n" % cmd_str)
+            cmd_str = ' '.join(term_cmd)
+        self._log("Launching in terminal: %s\n" % cmd_str)
 
+        # Start process
+        self.process = subprocess.Popen(term_cmd)
         self.start_btn.config(state='disabled')
         self.stop_btn.config(state='normal')
 
-        def run_proc():
-            self.process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-            for raw in self.process.stdout:
-                try:
-                    line = raw.decode('utf-8')
-                except:
-                    line = str(raw)
-                self._log(line)
+        # Monitor exit
+        def wait_proc():
+            self.process.wait()
             self._on_end()
-
-        t = threading.Thread(target=run_proc)
-        t.setDaemon(True)
+        t = threading.Thread(target=wait_proc)
+        t.daemon = True
         t.start()
 
     def stop_strip(self):

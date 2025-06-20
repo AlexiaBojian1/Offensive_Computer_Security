@@ -1,153 +1,121 @@
 # Offensive_Computer_Security
 
 There are 2 sections in this README:
+
 1. The GUI
-2. The ARP spoofing guige 
+2. The ARP spoofing guige
 3. The DNS spoofing guide
 4. The SSL stripping guide
 5. The MITM guide
 
 # Graphical User Interface (GUI)
 
+> **NOTE:** all UI code lives on the `ui_dns` branch of this repo.  
+> To fetch it:
+> git clone -b ui_dns https://github.com/<your-handle>/Offensive_Computer_Security.git
+> cd Offensive_Computer_Security/hackingapp\ui
+
 ## Software Overview
 
-Desktop UI for launching DNS spoofing, ARP poisoning and SSL stripping with using Scapy. And PySlide6 is used to create the UI. It includes real time logging of what has happened and there is a built in help pdf that the users can use whne they are lost.
+This repository is a **Tkinter-based** desktop UI with three core network-attack tools (written in Python 2.7 + Scapy):
 
-## Prerequisites (these can change in the future this is what we thought at the moment)
+- **ARP Spoofing** (`arp_ui.py`): choose interface, mode (`pair`/`silent`/`flood`), targets or CIDR, and interval; spawns `arp.py` in a subprocess and streams its output into a scrollable log.
+- **DNS Spoofing** (`dns_ui.py`): select interface, load a YAML mapping file, set relay/upstream options, TTL and BPF filter; launches `dns.py` and shows live `logging` output in a Tk Text widget.
+- **SSL Stripping** (`ssl_ui.py`): pick interface, optional BPF and host-wildcards, toggle verbose/quiet; runs `ssl.py` in a background thread and timestamps each line of its stdout in the GUI.
 
-Operating System: Linux
-Python: 3.7 or newer
-Permissions: Run with root/administrator rights
+All three can also be launched from a single windows with tabs from (`combined.py`), which uses a `ttk.Notebook` to let you pick the ARP, DNS or SSL panel. Each UI requires root (raw sockets), however when runing (`combined.py`) giving root access also applies to the opened tabs of attacks. This is done by running teh (`combined.py`) by `sudo python2 combined.py`.
 
-## Installation
+## Prerequisites
 
-Install required packages:
+- **OS:** Linux (must support raw sockets)
+- **Python:** 2.7
+- **Permissions:** root access
+
+## Install required packages:
+
 ```bash
-pip install scapy PySide6 PyYAML
+pip2 install scapy scapy PyYAML
 ```
+
+Also Get Tkinter GUI binding:
+
+```bash
+sudo apt-get install python-tk
+```
+
 Place the main script (ui.py) and help.pdf in the same folder.
 
 ## Launching the Application
-Run the UI with sudo (or equivalent):
-```bash
-sudo python -m hackingapp.app
-```
 
-## Main Window Layout
-
-### Toolbar (Top)
-• Interface: Dropdown to select your network adapter (e.g. eth0, wlan0) (this is not fully integrated at the moment)
-• Load DNS Mapping…: Opens file dialog to load a YAML file mapping domains to spoofed IPs
-• Help: Opens the bundled help.pdf in your system’s default PDF viewer (help.pdf is not yet ready as we are currently working on it; so, there is only a test pdf)
-• Quit: Closes the application
-
-### Targets Panel (Left)
-A table with columns IP, Mask, Spoof IP
-Click + Add row to insert a new target for ARP poisoning
-
-### Modes Panel (Center) (these modes are not implemented; hwoever we have some progress on ARP poisoning and DNS spoofing)
-Checkboxes to enable one or more attack modes:
-• ARP Poisoning
-• DNS Spoofing
-• SSL Stripping
-
-### Logs Panel (Right)
-Live, timestamped output showing ARP replies sent and DNS queries spoofed
-
-### Control Buttons (Bottom)
-• Silent / All-Out (radio buttons): choose between stealth or aggressive timing (not yet implemented)
-• Start: Begin selected attacks
-• Pause / Resume: Temporarily suspend and resume packet loops (not yet implemented)
-• Stop: Halt all activity and threads
-
-
-### Pausing and Resuming
-
-Click Pause to suspend packet loops without killing threads
-
-Button label switches to Resume—click again to continue
-
-
-### Stopping
-
-Click Stop to terminate all attacks and return to an idle state
-
-
-### Help
-
-Click the Help button to open help.pdf
-
-If the PDF is missing, you’ll see an error prompt
-# VMs setup
-
-| VM role | Example IP | Example MAC | Notes |
-|---------|------------|-------------|-------|
-| **Attacker** | `10.0.50.5` | `08:00:27:AA:BB:01` | runs `ARPPoisoner`, enable IP-forward |
-| **Victim 1** | `10.0.50.11` | `08:00:27:AA:BB:11` | |
-| **Victim 2** *(optional)* | `10.0.50.12` | `08:00:27:AA:BB:12` | second target |
-| **Gateway / Router** | `10.0.50.1` | `52:54:00:12:35:00` | VM-net virtual router |
-
-* All NICs sit on the **same Host-Only / Internal** switch (no NAT / Bridged).  
-* Discover each address & MAC:
+Run the combined UI with sudo:
 
 ```bash
-ip addr show                # own IP & MAC
-ip route | grep default     # gateway IP
-ip neigh | grep <gw-ip>     # gateway MAC
+sudo python2 combined.py
 ```
-# ARP Poisoning 
 
-A **Scapy‑powered toolkit** that ships in two flavours:
+To run each UI for each attack:
 
-1. **Fully‑fledged CLI** – run complex attacks from the terminal (`arp.py`).
-
----
-
-
-##  Features
-
-| Mode               | Purpose                                                                              |
-| ------------------ | ------------------------------------------------------------------------------------ |
-| **Pair** (default) | Poison one or more `<victim IP, gateway IP>` pairs – classic MITM.                   |
-| **Flood**          | Claim **every IP** in a CIDR is at the attacker’s MAC; causes widespread disruption. |
-| **Silent**         | Only answers when ARP *requests* are observed – stealthier than active spraying.     |
-
-Additional goodness:
-
-* **Active/Silent toggle** – choose periodic bursts (`--interval`) or reactive replies.
-* **Automatic MAC resolution** – queries real MACs before forging packets.
-* **Graceful shutdown** – real ARP entries are restored on *Ctrl‑C* (pair + silent modes).
-* **Threaded design** – mix multiple pair lists, flood, and silent responders concurrently.
-* **Pluggable logging** – Python `logging` with console output by default.
-
----
-
-##  Requirements
-
-| Item       | Version / Notes                            |
-| ---------- | ------------------------------------------ |
-| Python     | 3.8 +                                      |
-| Scapy      | `pip install scapy`                        |
-| OS         | Linux / \*BSD / macOS (raw‑socket support) |
-| Privileges | Run as **root** or with `CAP_NET_RAW`      |
-
----
-
-## Installation
+- ARP Spoofing
 
 ```bash
-# 1. Clone repo (or copy the files)
-$ git clone https://github.com/your-handle/arp-poisoner.git
-$ cd arp-poisoner
-
-# 2. (Optional) Virtual env
-$ python3 -m venv venv && source venv/bin/activate
-
-# 3. Install deps
-$ pip install -r requirements.txt  # currently just scapy
+sudo python2 arp_ui.py
 ```
 
+- DNS Spoofing
+
+```bash
+sudo python2 dns_ui.py
+```
+
+- SSl Stripping
+
+```bash
+sudo python2 ssl_ui.py
+```
+
+# VMs Setup
+
+Basic network setup for the **Default Project Victim** and **M3 Attacker**:
+
+> Ensure all VMs are on the same host-only/internal network.
+
 ---
+
+# UI Walkthrough
+
+## ARP Spoofing UI (`arp_ui.py`)
+
+- **Interface:**
+- **Mode:**
+  - `pair` – two-host poisoning
+  - `silent` – reactive replies only
+  - `flood` – claim every IP in a CIDR
+- **Victims (CSV)** + **Gateway** (for `pair`/`silent`)
+- **CIDR** + **Gateway** (for `flood`)
+- **Interval (s):** seconds between packets
+- **Start:** launches `arp.py` with the specified arguments
+- **Stop:** sends `SIGINT` and restores ARP caches
+
+## DNS Spoofing UI (`dns_ui.py`)
+
+- **Interface:**
+- **Mapping file:** YAML map
+- **Relay unmatched:** checkbox to forward other queries
+- **Upstream DNS:** default `8.8.8.8`
+- **TTL (secs):** lifetime of forged answers
+- **BPF filter:** limit the sniffing scope
+- **Log level:** `DEBUG` / `INFO` / `ERROR`
+- **Start / Stop:** control the `DNSSpoofer` process
+
+## SSL Strip UI (`ssl_ui.py`)
+
+- **Interface:**
+- **BPF filter:** optional packet filter
+- **Hosts (CSV wildcards):** e.g. `*.example.com`
+- **Verbose / Quiet:** toggle logging detail
+- **Start:** launches `ssl.py`
+- **Stop:** terminates the process
+- **Log panel:** each line prefixed `[HH:MM:SS]`
 
 ##  CLI Quick Start
 
@@ -178,13 +146,13 @@ sudo python3 arp_poisoner_fully_fledged.py \
 
 | Option         | Default    | Description                                          |
 | -------------- | ---------- | ---------------------------------------------------- |
-| `--iface, -i`  | *required* | Network interface to send/receive on (e.g., `eth0`). |
+| `--iface, -i`  | _required_ | Network interface to send/receive on (e.g., `eth0`). |
 | `--mode`       | `pair`     | `pair`, `flood`, or `silent`.                        |
 | `--victims`    | –          | Comma‑separated victim IPs (`pair`/`silent`).        |
 | `--gateway`    | –          | Gateway IP (`pair`/`silent`/`flood`).                |
 | `--cidr`       | –          | CIDR block to flood (`flood` mode).                  |
 | `--interval`   | `10`       | Seconds between bursts in active modes.              |
-| `--no‑restore` | *False*    | Skip pushing real MACs back on exit (pair modes).    |
+| `--no‑restore` | _False_    | Skip pushing real MACs back on exit (pair modes).    |
 
 Run `-h/--help` to see the full list any time.
 
@@ -213,9 +181,9 @@ finally:
 
 ##  How It Works (Very Short)
 
-* **ARP cache** ⇒ local table of IP→MAC mappings used by hosts to send Ethernet frames.
-* Tool forges **ARP *reply* packets** claiming: `spoof_ip is‑at attacker_mac`.
-* Victims update their cache, redirecting IPv4 traffic to you. Combine with packet‑forwarding + `iptables`/`pf` for full man‑in‑the‑middle.
+- **ARP cache** ⇒ local table of IP→MAC mappings used by hosts to send Ethernet frames.
+- Tool forges **ARP _reply_ packets** claiming: `spoof_ip is‑at attacker_mac`.
+- Victims update their cache, redirecting IPv4 traffic to you. Combine with packet‑forwarding + `iptables`/`pf` for full man‑in‑the‑middle.
 
 ---
 
@@ -231,11 +199,10 @@ Pair & silent modes automatically push correct MACs back **5×** on exit. If you
 
 ##  Roadmap
 
-* IPv6 (Neighbor Discovery) support
-* DNS‑spoof helper integrated into silent mode
-* PyPI & standalone `.deb` package
-* pytest‑based test‑suite using Scapy’s offline PCAPs
-
+- IPv6 (Neighbor Discovery) support
+- DNS‑spoof helper integrated into silent mode
+- PyPI & standalone `.deb` package
+- pytest‑based test‑suite using Scapy’s offline PCAPs
 
 # DNS Spoofer Tool
 
@@ -243,15 +210,15 @@ Pair & silent modes automatically push correct MACs back **5×** on exit. If you
 
 ###  Features
 
-* **IPv6 ready** – answers both A (IPv4) and AAAA (IPv6) queries and forges IPv6 packets where needed.
-* **DNS‑over‑TCP support** – crafts sequence‑correct TCP responses so Windows, DoH fallback, and other picky resolvers accept spoofed answers.
-* **Multiple answers per name** – map a hostname to **one IP or an IP list** (`A` or `AAAA` records) in a human‑friendly YAML file.
-* **Wildcard patterns** – `*.example.com` entries supported (works with lists too).
-* **Configurable TTL** – choose how long poisoned answers stick with `--ttl`.
-* **Relay mode** – optionally forward unmatched queries to an upstream resolver (`--relay`).
-* **Custom BPF filter** – `--bpf` lets you limit sniffing to a victim subnet.
-* **Silent ⇄ Verbose logging** – `--quiet` and `--verbose` flip logging level.
-* **Graceful shutdown** – UDP and TCP sniffers exit cleanly on *Ctrl‑C*.
+- **IPv6 ready** – answers both A (IPv4) and AAAA (IPv6) queries and forges IPv6 packets where needed.
+- **DNS‑over‑TCP support** – crafts sequence‑correct TCP responses so Windows, DoH fallback, and other picky resolvers accept spoofed answers.
+- **Multiple answers per name** – map a hostname to **one IP or an IP list** (`A` or `AAAA` records) in a human‑friendly YAML file.
+- **Wildcard patterns** – `*.example.com` entries supported (works with lists too).
+- **Configurable TTL** – choose how long poisoned answers stick with `--ttl`.
+- **Relay mode** – optionally forward unmatched queries to an upstream resolver (`--relay`).
+- **Custom BPF filter** – `--bpf` lets you limit sniffing to a victim subnet.
+- **Silent ⇄ Verbose logging** – `--quiet` and `--verbose` flip logging level.
+- **Graceful shutdown** – UDP and TCP sniffers exit cleanly on *Ctrl‑C*.
 
 ###  Requirements
 
@@ -318,14 +285,14 @@ sudo python3 dns_spoofer.py \
 
 | Option         | Default    | Description                               |
 | -------------- | ---------- | ----------------------------------------- |
-| `-i, --iface`  | *required* | Interface to bind/sniff on.               |
-| `-m, --map`    | *required* | YAML mapping file with hostname⇨IP(s).    |
-| `--relay`      | *False*    | Relay unmatched queries to `--upstream`.  |
+| `-i, --iface`  | _required_ | Interface to bind/sniff on.               |
+| `-m, --map`    | _required_ | YAML mapping file with hostname⇨IP(s).    |
+| `--relay`      | _False_    | Relay unmatched queries to `--upstream`.  |
 | `--upstream`   | `8.8.8.8`  | Upstream resolver for relay mode.         |
 | `--ttl`        | `300`      | TTL seconds for forged answers.           |
 | `--bpf`        | –          | Extra BPF filter (AND‑ed with `port 53`). |
-| `-q/--quiet`   | *False*    | Errors only.                              |
-| `-v/--verbose` | *False*    | Full debug output.                        |
+| `-q/--quiet`   | _False_    | Errors only.                              |
+| `-v/--verbose` | _False_    | Full debug output.                        |
 
 Run `-h/--help` any time for the exhaustive list.
 
@@ -339,14 +306,11 @@ Run `-h/--help` any time for the exhaustive list.
 
 ###  Stopping & Cleanup
 
-Hit *Ctrl‑C*. Both UDP and TCP sniffers break out and the main thread joins. No further action is needed—DNS caches eventually age‑out after the TTL.
+Hit _Ctrl‑C_. Both UDP and TCP sniffers break out and the main thread joins. No further action is needed—DNS caches eventually age‑out after the TTL.
 
 ### 🗺️ Roadmap
 
-* EDNS0 & DNSSEC awareness (forwarded intact in relay mode)
-* mDNS / LLMNR spoof helpers
-* Docker image & PyPI package
-* Unit tests with prerecorded PCAPs
-
-
-
+- EDNS0 & DNSSEC awareness (forwarded intact in relay mode)
+- mDNS / LLMNR spoof helpers
+- Docker image & PyPI package
+- Unit tests with prerecorded PCAPs
